@@ -78,7 +78,7 @@ void parseChunk(std::vector<uint8_t> const& bytes){
   if(frameBuffer.size()<300)break;
   auto valid=[&](size_t len){uint8_t checksum=0;for(size_t i=0;i<len-1;i++)checksum+=frameBuffer[i];return checksum==frameBuffer[len-1];};
   size_t len=300;
-  if(!valid(300)){if(frameBuffer.size()<320)break;if(valid(320))len=320;else{frameBuffer.erase(frameBuffer.begin());continue;}}
+  if(!valid(300)){if(frameBuffer.size()<320)break;if(valid(320))len=320;else{static unsigned invalidCount=0;if(++invalidCount%10==1)log(L"BLE frame CRC mismatch; check model/protocol or fragment assembly");frameBuffer.erase(frameBuffer.begin());continue;}}
   std::vector<uint8_t> frame(frameBuffer.begin(),frameBuffer.begin()+len);frameBuffer.erase(frameBuffer.begin(),frameBuffer.begin()+len);
   rxFrames.fetch_add(1);
   if(frame[4]==2){cellFrames.fetch_add(1);int mode=0;if(protocolBox)mode=(int)SendMessageW(protocolBox,CB_GETCURSEL,0,0);post(WM_VALUES,parse(frame,mode));}
