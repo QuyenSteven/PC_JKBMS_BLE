@@ -25,6 +25,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "dashboard.h"
 #pragma comment(lib,"Comctl32.lib")
 #pragma comment(lib,"Comdlg32.lib")
 #pragma comment(lib,"WindowsApp.lib")
@@ -145,20 +146,36 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
  switch(msg){
  case WM_CREATE:{
   windowHandle=h;
-  control(L"BUTTON",L"Scan BLE",BS_PUSHBUTTON,12,12,100,32,SCAN);
-  control(L"BUTTON",L"Connect",BS_PUSHBUTTON,120,12,100,32,CONNECT);
-  control(L"BUTTON",L"Disconnect",BS_PUSHBUTTON,228,12,110,32,DISCONNECT);
-  control(L"BUTTON",L"Save RAW",BS_PUSHBUTTON,346,12,100,32,SAVE);
-  protocolBox=control(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_VSCROLL,460,12,215,180,PROTOCOL);
-  for(auto name:{L"JK02_32S",L"JK02_24S",L"JK04"})SendMessageW(protocolBox,CB_ADDSTRING,0,(LPARAM)name);
-  SendMessageW(protocolBox,CB_SETCURSEL,0,0);
-  devicesList=control(L"LISTBOX",L"",WS_BORDER|WS_VSCROLL|LBS_NOTIFY,12,56,663,128,DEVICES);
-  valuesBox=control(L"EDIT",L"Select a device and connect.\r\nRead-only experimental decoder.",WS_BORDER|WS_VSCROLL|ES_MULTILINE|ES_READONLY|ES_AUTOVSCROLL,12,194,663,283);
-  logBox=control(L"EDIT",L"",WS_BORDER|WS_VSCROLL|ES_MULTILINE|ES_READONLY|ES_AUTOVSCROLL,12,486,663,150);
-  control(L"STATIC",L"READ ONLY - no protection writes, MOSFET switching or reboot commands.",0,12,644,663,25);
+  control(L"BUTTON",L"Scan BLE",BS_PUSHBUTTON,0,0,100,35,SCAN);
+  control(L"BUTTON",L"Connect",BS_PUSHBUTTON,0,0,100,35,CONNECT);
+  control(L"BUTTON",L"Disconnect",BS_PUSHBUTTON,0,0,100,35,DISCONNECT);
+  control(L"BUTTON",L"Save RAW",BS_PUSHBUTTON,0,0,100,35,SAVE);
+  dashboard::setup(h,devicesList,valuesBox,logBox,protocolBox);
+  RECT rect{};GetClientRect(h,&rect);
+  dashboard::layout(rect.right,rect.bottom,devicesList,valuesBox,logBox,protocolBox);
   return 0;
  }
+ case WM_SIZE:{
+  dashboard::layout(LOWORD(lp),HIWORD(lp),devicesList,valuesBox,logBox,protocolBox);
+  return 0;
+ }
+ case WM_PAINT:{
+  PAINTSTRUCT ps{};HDC dc=BeginPaint(h,&ps);RECT rect{};GetClientRect(h,&rect);
+  dashboard::paint(dc,rect);EndPaint(h,&ps);return 0;
+ }
+ case WM_CTLCOLORSTATIC:
+ case WM_CTLCOLOREDIT:
+ case WM_CTLCOLORLISTBOX:{
+  HDC dc=(HDC)wp;SetTextColor(dc,dashboard::fg);
+  SetBkColor(dc,dashboard::bg);
+  SetBkMode(dc,TRANSPARENT);
+  return (LRESULT)dashboard::brushFor(msg);
+ }
  case WM_COMMAND:switch(LOWORD(wp)){
+  case dashboard::ID_DASH: case dashboard::ID_CELLS: case dashboard::ID_CONTROL: case dashboard::ID_SETTINGS: case dashboard::ID_LOG:{
+   dashboard::page=static_cast<dashboard::Page>(LOWORD(wp)-dashboard::ID_DASH);
+   RECT rect{};GetClientRect(h,&rect);dashboard::layout(rect.right,rect.bottom,devicesList,valuesBox,logBox,protocolBox);break;
+  }
   case SCAN:SendMessageW(devicesList,LB_RESETCONTENT,0,0);{std::lock_guard lock(devicesMutex);discovered.clear();}scan();break;
   case CONNECT:{
    int idx=(int)SendMessageW(devicesList,LB_GETCURSEL,0,0);if(idx==LB_ERR){log(L"Select device");break;}
@@ -171,15 +188,15 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
  }return 0;
  case WM_FOUND:{std::unique_ptr<std::wstring> name(reinterpret_cast<std::wstring*>(lp));if(SendMessageW(devicesList,LB_FINDSTRINGEXACT,(WPARAM)-1,(LPARAM)name->c_str())==LB_ERR)SendMessageW(devicesList,LB_ADDSTRING,0,(LPARAM)name->c_str());return 0;}
  case WM_LOG:{std::unique_ptr<std::wstring> line(reinterpret_cast<std::wstring*>(lp));int end=GetWindowTextLengthW(logBox);SendMessageW(logBox,EM_SETSEL,end,end);auto entry=*line+L"\r\n";SendMessageW(logBox,EM_REPLACESEL,FALSE,(LPARAM)entry.c_str());return 0;}
- case WM_VALUES:{std::unique_ptr<std::wstring> value(reinterpret_cast<std::wstring*>(lp));SetWindowTextW(valuesBox,value->c_str());return 0;}
- case WM_DESTROY:disconnect();windowHandle=nullptr;PostQuitMessage(0);return 0;
+ case WM_VALUES:{std::unique_ptr<std::wstring> value(reinterpret_cast<std::wstring*>(lp));SetWindowTextW(valuesBox,value->c_str());dashboard::update(*value);return 0;}
+ case WM_DESTROY:disconnect();dashboard::shutdown();windowHandle=nullptr;PostQuitMessage(0);return 0;
  }return DefWindowProcW(h,msg,wp,lp);
 }
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,LPWSTR,int show){
  try{
   init_apartment(apartment_type::multi_threaded);INITCOMMONCONTROLSEX controls{sizeof(controls),ICC_STANDARD_CLASSES};InitCommonControlsEx(&controls);
   WNDCLASSEXW cls{sizeof(cls)};cls.lpfnWndProc=procedure;cls.hInstance=instance;cls.lpszClassName=L"JK_BMS_PC";cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);RegisterClassExW(&cls);
-  HWND hwnd=CreateWindowExW(0,cls.lpszClassName,L"JK BMS PC Studio - C++/WinRT BLE Preview",WS_OVERLAPPEDWINDOW|WS_VISIBLE,CW_USEDEFAULT,CW_USEDEFAULT,710,725,nullptr,nullptr,instance,nullptr);
+  HWND hwnd=CreateWindowExW(0,cls.lpszClassName,L"JK BMS Studio | Native BLE Dashboard",WS_OVERLAPPEDWINDOW|WS_VISIBLE,CW_USEDEFAULT,CW_USEDEFAULT,1280,860,nullptr,nullptr,instance,nullptr);
   ShowWindow(hwnd,show);MSG message{};while(GetMessageW(&message,nullptr,0,0)>0){TranslateMessage(&message);DispatchMessageW(&message);}return (int)message.wParam;
  }catch(...){MessageBoxW(nullptr,L"Windows Bluetooth initialization failed",L"JK BMS",MB_ICONERROR);return 1;}
 }
