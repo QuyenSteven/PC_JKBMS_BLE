@@ -130,7 +130,7 @@ inline void paint(HDC dc,RECT client){
  FillRect(dc,&client,darkBrush);
  fillRound(dc,{0,0,190,client.bottom},RGB(18,28,44),0);
  text(dc,24,78,L"BATTERY MANAGER",accent,fontSmall);
- for(int i=0;i<5;i++)if(page==i)fillRound(dc,{10,101+i*54,180,149+i*54},RGB(28,75,85),10);
+ for(int i=0;i<5;i++)if(static_cast<int>(page)==i)fillRound(dc,{10,101+i*54,180,149+i*54},RGB(28,75,85),10);
  int x=218,w=client.right-x-24;
  if(w<300)return;
  fillRound(dc,{x,122,x+w,233},panel);
@@ -167,7 +167,7 @@ inline void paint(HDC dc,RECT client){
 }
 inline HBRUSH brushFor(UINT msg){return msg==WM_CTLCOLOREDIT?inputBrush:darkBrush;}
 inline void shutdown(){
- for(auto& f:{fontSmall,fontMedium,fontLarge,fontHeader})if(f){DeleteObject(f);f=nullptr;}
- for(auto& b:{darkBrush,panelBrush,inputBrush})if(b){DeleteObject(b);b=nullptr;}
+ for(auto f:{fontSmall,fontMedium,fontLarge,fontHeader})if(f)DeleteObject(f);
+ for(auto b:{darkBrush,panelBrush,inputBrush})if(b)DeleteObject(b);
 }
 }
