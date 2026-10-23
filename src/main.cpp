@@ -76,6 +76,7 @@ void stopScanner(){
 }
 void disconnectBms(){
  stopScanner();
+ {std::lock_guard lock(frameMutex);frameBuffer.clear();}
  if(notifyChar){try{notifyChar.ValueChanged(notifyToken);}catch(...){}}
  notifyChar=nullptr;writeChar=nullptr;bms=nullptr;
  status=L"disconnected";field(L"status",status);log(L"Disconnected");
@@ -100,6 +101,7 @@ void scanBms(){
 constexpr winrt::guid service{0x0000FFE0,0,0x1000,{0x80,0,0,0,0x80,0x5F,0x9B,0x34,0xFB}};
 constexpr winrt::guid characteristic{0x0000FFE1,0,0x1000,{0x80,0,0,0,0x80,0x5F,0x9B,0x34,0xFB}};
 std::vector<uint8_t> frameBuffer;
+std::mutex frameMutex;
 void parseFrame(std::vector<uint8_t> const& b){
  if(b.size()!=300&&b.size()!=320)return;
  uint8_t type=b[4];
@@ -126,6 +128,7 @@ void parseFrame(std::vector<uint8_t> const& b){
  emit(s.str());
 }
 void feed(std::vector<uint8_t> const& chunk){
+ std::lock_guard frameLock(frameMutex);
  {std::lock_guard lock(rawMutex);rawBytes.insert(rawBytes.end(),chunk.begin(),chunk.end());}
  frameBuffer.insert(frameBuffer.end(),chunk.begin(),chunk.end());
  constexpr std::array<uint8_t,4> prefix{0x55,0xAA,0xEB,0x90};
