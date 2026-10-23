@@ -1,0 +1,21 @@
+name: Windows C++ Build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Restore NuGet dependencies
+        run: msbuild JK_BMS_PC.vcxproj -t:Restore -p:RestorePackagesConfig=true
+      - name: Build Windows x64 Release
+        run: msbuild JK_BMS_PC.vcxproj /m /p:Configuration=Release /p:Platform=x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JK-BMS-PC-Windows-x64
+          path: x64/Release/*.exe
+          if-no-files-found: error
