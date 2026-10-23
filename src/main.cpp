@@ -267,8 +267,8 @@ LRESULT CALLBACK wndProc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
  }
  case WM_DESTROY:
   running=false;queueReady.notify_all();
-  // Worker shutdown is deferred to process teardown if an OS Bluetooth call is blocked.
-  if(bleThread.joinable())bleThread.detach();
+  // Join before destroying global BLE/WinRT state to prevent use-after-free.
+  if(bleThread.joinable())bleThread.join();
   browser.Reset();controller.Reset();hwnd=nullptr;PostQuitMessage(0);return 0;
  }return DefWindowProcW(w,msg,wp,lp);
 }
