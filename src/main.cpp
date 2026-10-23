@@ -42,6 +42,8 @@ std::map<std::wstring,uint64_t> discovered;
 std::vector<uint8_t> frameBuffer, rawCapture;
 std::atomic<bool> active{false};
 std::atomic<unsigned> seq{0};
+std::atomic<unsigned> cellFrames{0};
+std::atomic<unsigned> rxFrames{0};
 BluetoothLEAdvertisementWatcher watcher{nullptr};
 BluetoothLEDevice device{nullptr};
 GattCharacteristic rx{nullptr}, tx{nullptr};
@@ -78,7 +80,8 @@ void parseChunk(std::vector<uint8_t> const& bytes){
   size_t len=300;
   if(!valid(300)){if(frameBuffer.size()<320)break;if(valid(320))len=320;else{frameBuffer.erase(frameBuffer.begin());continue;}}
   std::vector<uint8_t> frame(frameBuffer.begin(),frameBuffer.begin()+len);frameBuffer.erase(frameBuffer.begin(),frameBuffer.begin()+len);
-  if(frame[4]==2){int mode=0;if(protocolBox)mode=(int)SendMessageW(protocolBox,CB_GETCURSEL,0,0);post(WM_VALUES,parse(frame,mode));}
+  rxFrames.fetch_add(1);
+  if(frame[4]==2){cellFrames.fetch_add(1);int mode=0;if(protocolBox)mode=(int)SendMessageW(protocolBox,CB_GETCURSEL,0,0);post(WM_VALUES,parse(frame,mode));}
   else if(frame[4]==1)log(L"Settings frame received: "+std::to_wstring(len)+L" bytes");
   else if(frame[4]==3)log(L"Device info received: "+std::to_wstring(len)+L" bytes");
  }
@@ -97,12 +100,12 @@ void scan(){
  }catch(...){exception("scan");}
 }
 void disconnect(){
- try{active=false;post(WM_APP+4,L"disconnected");stopScan();if(rx){rx.ValueChanged(notifyToken);rx=nullptr;}tx=nullptr;device=nullptr;{std::lock_guard lock(frameMutex);frameBuffer.clear();}log(L"Disconnected");}
+ try{active=false;KillTimer(windowHandle,7001);cellFrames=0;post(WM_APP+4,L"disconnected");stopScan();if(rx){rx.ValueChanged(notifyToken);rx=nullptr;}tx=nullptr;device=nullptr;{std::lock_guard lock(frameMutex);frameBuffer.clear();}log(L"Disconnected");}
  catch(...){exception("disconnect");}
 }
 void sendRead(uint8_t opcode){
  try{
-  if(!tx)return;std::vector<uint8_t> frame(20,0);frame[0]=0xAA;frame[1]=0x55;frame[2]=0x90;frame[3]=0xEB;frame[4]=opcode;frame[16]=(uint8_t)seq.fetch_add(1);
+  if(!tx)return;std::vector<uint8_t> frame(20,0);frame[0]=0xAA;frame[1]=0x55;frame[2]=0x90;frame[3]=0xEB;frame[4]=opcode;frame[16]=0; // JK BLE read requests use reserved zero; checksum calculated below
   for(size_t i=0;i<19;i++)frame[19]+=frame[i];
   DataWriter writer;writer.WriteBytes(frame);
   auto properties=tx.CharacteristicProperties();
@@ -135,7 +138,8 @@ void connect(uint64_t address){
   if(status!=GattCommunicationStatus::Success){receiver.ValueChanged(token);log(L"Notifications unavailable");return;}
   device=d;rx=receiver;tx=sender;notifyToken=token;active=true;
   post(WM_APP+4,L"connected");
-  log(L"Connected, requesting configuration and device information");sendRead(0x96);sendRead(0x97);
+  log(L"Connected, requesting cell telemetry and device information");sendRead(0x96);sendRead(0x97);
+  PostMessageW(windowHandle,WM_APP+5,0,0);
  }catch(...){exception("connect");}
 }
 void save(){
@@ -156,6 +160,11 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
   dashboard::layout(rect.right,rect.bottom,devicesList,valuesBox,logBox,protocolBox);
   return 0;
  }
+ case WM_APP+5:{SetTimer(h,7001,5000,nullptr);return 0;}
+ case WM_TIMER:{if(wp==7001 && active && cellFrames.load()==0){
+   log(L"No cell telemetry yet: retrying 0x96 read request");
+   std::thread([]{init_apartment(apartment_type::multi_threaded);sendRead(0x96);}).detach();
+  }return 0;}
  case WM_SIZE:{
   dashboard::layout(LOWORD(lp),HIWORD(lp),devicesList,valuesBox,logBox,protocolBox);
   return 0;
@@ -195,7 +204,7 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
  case WM_FOUND:{std::unique_ptr<std::wstring> name(reinterpret_cast<std::wstring*>(lp));if(SendMessageW(devicesList,LB_FINDSTRINGEXACT,(WPARAM)-1,(LPARAM)name->c_str())==LB_ERR)SendMessageW(devicesList,LB_ADDSTRING,0,(LPARAM)name->c_str());return 0;}
  case WM_LOG:{std::unique_ptr<std::wstring> line(reinterpret_cast<std::wstring*>(lp));int end=GetWindowTextLengthW(logBox);SendMessageW(logBox,EM_SETSEL,end,end);auto entry=*line+L"\r\n";SendMessageW(logBox,EM_REPLACESEL,FALSE,(LPARAM)entry.c_str());return 0;}
  case WM_VALUES:{std::unique_ptr<std::wstring> value(reinterpret_cast<std::wstring*>(lp));SetWindowTextW(valuesBox,value->c_str());dashboard::update(*value);return 0;}
- case WM_DESTROY:disconnect();dashboard::shutdown();windowHandle=nullptr;PostQuitMessage(0);return 0;
+ case WM_DESTROY:KillTimer(h,7001);disconnect();dashboard::shutdown();windowHandle=nullptr;PostQuitMessage(0);return 0;
  }return DefWindowProcW(h,msg,wp,lp);
 }
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,LPWSTR,int show){
