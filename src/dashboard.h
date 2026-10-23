@@ -13,9 +13,10 @@ inline HWND host{}, title{}, subtitle{}, statVoltage{}, statCurrent{}, statPower
 inline HWND nav[5]{};
 inline HFONT fontSmall{}, fontMedium{}, fontLarge{}, fontHeader{};
 inline HBRUSH darkBrush{}, panelBrush{}, inputBrush{};
+inline bool connected=false;
 inline std::wstring telemetry=L"No telemetry received yet";
 inline std::vector<double> cellVoltages;
-inline COLORREF bg=RGB(14,20,33), panel=RGB(24,34,52), fg=RGB(226,235,247), muted=RGB(142,164,191), accent=RGB(38,207,173);
+inline COLORREF bg=RGB(11,16,27), panel=RGB(25,34,51), fg=RGB(238,244,252), muted=RGB(145,160,184), accent=RGB(48,213,175);
 inline HFONT makeFont(int px,int weight){return CreateFontW(-px,0,0,0,weight,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH|FF_DONTCARE,L"Segoe UI");}
 inline void setFont(HWND h,HFONT f){if(h)SendMessageW(h,WM_SETFONT,(WPARAM)f,TRUE);}
 inline HWND make(HWND parent,wchar_t const* klass,wchar_t const* text,DWORD style,int id,HFONT font){
@@ -28,11 +29,11 @@ inline void place(HWND h,int x,int y,int w,int height,bool visible=true){
 inline void setup(HWND parent,HWND& devices,HWND& values,HWND& logs,HWND& proto){
  host=parent;
  darkBrush=CreateSolidBrush(bg);panelBrush=CreateSolidBrush(panel);inputBrush=CreateSolidBrush(RGB(20,29,45));
- fontSmall=makeFont(14,FW_NORMAL);fontMedium=makeFont(17,FW_SEMIBOLD);fontLarge=makeFont(26,FW_BOLD);fontHeader=makeFont(30,FW_BOLD);
- title=make(parent,L"STATIC",L"JK BMS STUDIO",SS_LEFT,0,fontHeader);
- subtitle=make(parent,L"STATIC",L"Desktop battery management  /  Bluetooth Low Energy",SS_LEFT,0,fontSmall);
- wchar_t const* labels[]={L"Overview",L"Cells",L"Control",L"Protection",L"BLE Logs"};
- for(int i=0;i<5;i++)nav[i]=make(parent,L"BUTTON",labels[i],BS_PUSHBUTTON,ID_DASH+i,fontMedium);
+ fontSmall=makeFont(14,FW_NORMAL);fontMedium=makeFont(16,FW_SEMIBOLD);fontLarge=makeFont(30,FW_BOLD);fontHeader=makeFont(30,FW_BOLD);
+ title=make(parent,L"STATIC",L"JK BMS",SS_LEFT,0,fontHeader);
+ subtitle=make(parent,L"STATIC",L"Battery intelligence  /  Bluetooth monitoring",SS_LEFT,0,fontSmall);
+ wchar_t const* labels[]={L"Overview",L"Cells",L"Control",L"Protection",L"Diagnostics"};
+ for(int i=0;i<5;i++)nav[i]=make(parent,L"BUTTON",labels[i],BS_OWNERDRAW,ID_DASH+i,fontMedium);
  statVoltage=make(parent,L"STATIC",L"--.- V",SS_CENTER,0,fontLarge);
  statCurrent=make(parent,L"STATIC",L"--.- A",SS_CENTER,0,fontLarge);
  statPower=make(parent,L"STATIC",L"-- W",SS_CENTER,0,fontLarge);
@@ -55,30 +56,30 @@ inline void setup(HWND parent,HWND& devices,HWND& values,HWND& logs,HWND& proto)
 inline void layout(int w,int h,HWND devices,HWND values,HWND logs,HWND proto){
  if(w<1||h<1)return;
  const int left=190, x=left+28, area=std::max(300,w-x-24);
- place(title,24,22,165,42);place(subtitle,x,29,area,26);
- for(int i=0;i<5;i++)place(nav[i],16,104+i*54,158,44);
- place(GetDlgItem(host,101),x,78,104,36);
- place(GetDlgItem(host,102),x+112,78,108,36);
- place(GetDlgItem(host,103),x+228,78,112,36);
- place(GetDlgItem(host,104),x+348,78,106,36);
- place(proto,x+462,78,std::max(120,area-462),180);
+ place(title,24,28,165,42);place(subtitle,x,33,area,26);
+ for(int i=0;i<5;i++)place(nav[i],14,128+i*56,164,46);
+ place(GetDlgItem(host,101),x,84,112,40);
+ place(GetDlgItem(host,102),x+122,84,110,40);
+ place(GetDlgItem(host,103),x+244,84,117,40);
+ place(GetDlgItem(host,104),x+373,84,108,40);
+ place(proto,x+493,84,std::max(120,area-493),180);
  const bool showOverview=page==Overview, showCells=page==Cells, showControl=page==Control, showSettings=page==Settings, showLogs=page==Log;
- place(devices,x,132,area,93,true);
- int top=254, gap=12, quarter=(area-3*gap)/4;
+ place(devices,x,152,area,78,true);
+ int top=264, gap=16, quarter=(area-3*gap)/4;
  place(statVoltage,x+8,top+36,quarter-16,60,showOverview);
  place(statCurrent,x+quarter+gap+8,top+36,quarter-16,60,showOverview);
  place(statPower,x+(quarter+gap)*2+8,top+36,quarter-16,60,showOverview);
  place(statSoc,x+(quarter+gap)*3+8,top+36,quarter-16,60,showOverview);
- place(statMin,x+20,top+155,area/3-20,30,showOverview||showCells);
- place(statMax,x+area/3+20,top+155,area/3-20,30,showOverview||showCells);
- place(statDelta,x+area*2/3+20,top+155,area/3-30,30,showOverview||showCells);
- place(statCharge,x+20,top+212,area/3-20,32,showOverview||showControl);
- place(statDischarge,x+area/3+20,top+212,area/3-20,32,showOverview||showControl);
- place(statBalance,x+area*2/3+20,top+212,area/3-30,32,showOverview||showControl);
+ place(statMin,x+20,top+171,area/3-20,30,showOverview||showCells);
+ place(statMax,x+area/3+20,top+171,area/3-20,30,showOverview||showCells);
+ place(statDelta,x+area*2/3+20,top+171,area/3-30,30,showOverview||showCells);
+ place(statCharge,x+20,top+226,area/3-20,32,showOverview||showControl);
+ place(statDischarge,x+area/3+20,top+226,area/3-20,32,showOverview||showControl);
+ place(statBalance,x+area*2/3+20,top+226,area/3-30,32,showOverview||showControl);
  place(cellSummary,x+16,264,area-32,30,showCells);
- place(values,x+6,showSettings?258:showControl?350:showCells?std::min(h-190,650):showOverview?560:258,area-12,showOverview?std::max(75,h-650):showCells?std::max(80,h-730):showControl?std::max(120,h-440):std::max(130,h-350),showOverview||showCells||showControl||showSettings);
+ place(values,x+6,showSettings?258:showControl?350:showCells?std::min(h-190,650):showOverview?585:258,area-12,showOverview?std::max(75,h-675):showCells?std::max(80,h-730):showControl?std::max(120,h-440):std::max(130,h-350),showOverview||showCells||showControl||showSettings);
  place(logs,x+6,258,area-12,std::max(160,h-350),showLogs);
- place(notice,x+4,h-47,area-8,28,true);
+ place(notice,x+4,h-45,area-8,28,true);
  InvalidateRect(host,nullptr,TRUE);
 }
 inline std::wstring field(std::wstring const& input,std::wstring const& key){
@@ -128,44 +129,72 @@ inline void text(HDC dc,int x,int y,wchar_t const* str,COLORREF color,HFONT font
 }
 inline void paint(HDC dc,RECT client){
  FillRect(dc,&client,darkBrush);
- fillRound(dc,{0,0,190,client.bottom},RGB(18,28,44),0);
- text(dc,24,78,L"BATTERY MANAGER",accent,fontSmall);
- for(int i=0;i<5;i++)if(static_cast<int>(page)==i)fillRound(dc,{10,101+i*54,180,149+i*54},RGB(28,75,85),10);
- int x=218,w=client.right-x-24;
- if(w<300)return;
- fillRound(dc,{x,122,x+w,233},panel);
+ fillRound(dc,{0,0,190,client.bottom},RGB(17,25,40),0);
+ fillRound(dc,{19,23,57,60},accent,12);
+ text(dc,27,30,L"JK",RGB(8,26,28),fontMedium);
+ text(dc,23,83,L"BATTERY STUDIO",muted,fontSmall);
+ text(dc,23,107,L"WORKSPACE",RGB(94,112,138),fontSmall);
+ text(dc,24,client.bottom-106,L"JK BMS",fg,fontMedium);
+ text(dc,24,client.bottom-79,L"Native BLE  /  Windows",muted,fontSmall);
+ int x=218,w=client.right-x-24;if(w<300)return;
+ fillRound(dc,{x,145,x+w,244},panel);
+ text(dc,x+16,159,L"BLUETOOTH DEVICES",muted,fontSmall);
+ fillRound(dc,{x+w-151,31,x+w,63},connected?RGB(26,77,66):RGB(49,58,75),16);
+ text(dc,x+w-137,39,connected?L"●  CONNECTED":L"○  OFFLINE",connected?accent:muted,fontSmall);
  if(page==Overview){
-  text(dc,x+18,239,L"LIVE BATTERY STATUS",muted,fontSmall);
-  int gap=12,q=(w-3*gap)/4;
-  for(int i=0;i<4;i++)fillRound(dc,{x+i*(q+gap),254,x+i*(q+gap)+q,373},panel);
-  wchar_t const* names[]={L"PACK VOLTAGE",L"CURRENT",L"POWER",L"STATE OF CHARGE"};
-  for(int i=0;i<4;i++)text(dc,x+i*(q+gap)+14,265,names[i],muted,fontSmall);
-  fillRound(dc,{x,397,x+w,540},panel);
-  text(dc,x+14,408,L"CELL BALANCE / MOSFET STATUS",muted,fontSmall);
-  text(dc,x+6,541,L"DEVICE TELEMETRY",muted,fontSmall);
- } else if(page==Cells){
-  text(dc,x+12,234,L"CELL VOLTAGE COMPARISON",muted,fontMedium);
-  fillRound(dc,{x,298,x+w,std::min(static_cast<int>(client.bottom)-184,638)},panel);
-  int baseline=std::min(static_cast<int>(client.bottom)-203,610), graphH=220;
+  text(dc,x,253,L"BATTERY OVERVIEW",fg,fontMedium);
+  int gap=16,q=(w-3*gap)/4;
+  wchar_t const* names[]={L"PACK VOLTAGE",L"CURRENT",L"LIVE POWER",L"STATE OF CHARGE"};
+  for(int i=0;i<4;i++){
+   int sx=x+i*(q+gap);
+   fillRound(dc,{sx,264,sx+q,404},panel,22);
+   fillRound(dc,{sx+16,281,sx+21,296},i==3?RGB(102,163,247):accent,3);
+   text(dc,sx+30,279,names[i],muted,fontSmall);
+  }
+  fillRound(dc,{x,428,x+w,577},panel,20);
+  text(dc,x+20,444,L"CELL HEALTH",fg,fontMedium);
+  text(dc,x+20,497,L"POWER PATH",fg,fontMedium);
+  text(dc,x+6,580,L"LIVE TELEMETRY",muted,fontSmall);
+ }else if(page==Cells){
+  text(dc,x,254,L"CELL PERFORMANCE",fg,fontMedium);
+  fillRound(dc,{x,298,x+w,std::min(static_cast<int>(client.bottom)-184,670)},panel,18);
+  int baseline=std::min(static_cast<int>(client.bottom)-220,626),graphH=220;
   if(!cellVoltages.empty()&&baseline>345){
    auto mm=std::minmax_element(cellVoltages.begin(),cellVoltages.end());double lo=std::max(0.0,*mm.first-0.06),hi=*mm.second+0.06;
-   int barWidth=std::max(4,(w-40)/(int)cellVoltages.size()-5);
+   int barWidth=std::max(4,(w-56)/(int)cellVoltages.size()-7);
    for(size_t i=0;i<cellVoltages.size();i++){
-    int bx=x+20+(int)(i*(w-40)/cellVoltages.size()),bh=(int)((cellVoltages[i]-lo)/(hi-lo)*graphH);
-    fillRound(dc,{bx,baseline-bh,bx+barWidth,baseline},cellVoltages[i]==*mm.first?RGB(248,171,85):cellVoltages[i]==*mm.second?RGB(236,111,114):accent,5);
-    if(cellVoltages.size()<=24){wchar_t buf[12];swprintf_s(buf,L"%zu",i+1);text(dc,bx,baseline+7,buf,muted,fontSmall);}
+    int bx=x+28+(int)(i*(w-56)/cellVoltages.size()),bh=(int)((cellVoltages[i]-lo)/(hi-lo)*graphH);
+    fillRound(dc,{bx,baseline-bh,bx+barWidth,baseline},cellVoltages[i]==*mm.first?RGB(247,181,96):cellVoltages[i]==*mm.second?RGB(241,111,126):accent,6);
+    if(cellVoltages.size()<=24){wchar_t buf[12];swprintf_s(buf,L"%zu",i+1);text(dc,bx,baseline+10,buf,muted,fontSmall);}
    }
-  } else text(dc,x+18,336,L"No valid cell measurements yet. Connect and select the correct JK protocol.",muted,fontMedium);
- } else if(page==Control || page==Settings){
-  fillRound(dc,{x,243,x+w,328},panel);
-  text(dc,x+18,258,page==Control?L"MOSFET / BALANCING CONTROLS":L"PROTECTION / CONFIGURATION",fg,fontMedium);
-  text(dc,x+18,290,L"Read-only mode: write commands disabled until verified against model and firmware.",RGB(242,177,91),fontSmall);
+  }else text(dc,x+25,344,L"No valid cell measurements. Connect to a JK BMS to see the cell chart.",muted,fontSmall);
+ }else if(page==Control||page==Settings){
+  text(dc,x,255,page==Control?L"DEVICE CONTROLS":L"PROTECTION SETTINGS",fg,fontMedium);
+  fillRound(dc,{x,297,x+w,384},panel,18);
+  text(dc,x+22,312,L"DEVICE WRITE ACCESS LOCKED",RGB(255,186,103),fontMedium);
+  text(dc,x+22,348,L"Model-specific commands must be verified before enabling any writes.",muted,fontSmall);
  }else{
-  fillRound(dc,{x,240,x+w,client.bottom-66},panel);
-  text(dc,x+16,241,L"BLE CONNECTION LOG / DIAGNOSTICS",muted,fontSmall);
+  text(dc,x,254,L"BLE DIAGNOSTICS",fg,fontMedium);
+  fillRound(dc,{x,298,x+w,client.bottom-66},panel,18);
  }
 }
-inline HBRUSH brushFor(UINT msg){return msg==WM_CTLCOLOREDIT?inputBrush:darkBrush;}
+inline bool drawButton(DRAWITEMSTRUCT const* item){
+ if(!item||item->CtlType!=ODT_BUTTON)return false;
+ int id=(int)item->CtlID;
+ bool navButton=id>=ID_DASH&&id<=ID_LOG;
+ bool selected=navButton&&id-ID_DASH==static_cast<int>(page);
+ bool pressed=(item->itemState&ODS_SELECTED)!=0;
+ COLORREF background=selected?RGB(29,88,83):id==102?RGB(34,176,147):pressed?RGB(44,61,84):navButton?RGB(17,25,40):RGB(35,49,71);
+ COLORREF foreground=selected?RGB(225,255,248):id==102?RGB(9,29,29):fg;
+ HDC dc=item->hDC;RECT r=item->rcItem;
+ fillRound(dc,{r.left+1,r.top+2,r.right-1,r.bottom-2},background,14);
+ if(selected)fillRound(dc,{r.left+3,r.top+10,r.left+7,r.bottom-10},accent,4);
+ wchar_t label[128]{};GetWindowTextW(item->hwndItem,label,128);
+ SelectObject(dc,fontMedium);SetTextColor(dc,foreground);SetBkMode(dc,TRANSPARENT);
+ DrawTextW(dc,label,-1,&r,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+ return true;
+}
+inline HBRUSH brushFor(UINT msg){return msg==WM_CTLCOLOREDIT||msg==WM_CTLCOLORLISTBOX?inputBrush:panelBrush;}
 inline void shutdown(){
  for(auto f:{fontSmall,fontMedium,fontLarge,fontHeader})if(f)DeleteObject(f);
  for(auto b:{darkBrush,panelBrush,inputBrush})if(b)DeleteObject(b);
