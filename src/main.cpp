@@ -97,7 +97,7 @@ void scan(){
  }catch(...){exception("scan");}
 }
 void disconnect(){
- try{active=false;stopScan();if(rx){rx.ValueChanged(notifyToken);rx=nullptr;}tx=nullptr;device=nullptr;{std::lock_guard lock(frameMutex);frameBuffer.clear();}log(L"Disconnected");}
+ try{active=false;post(WM_APP+4,L"disconnected");stopScan();if(rx){rx.ValueChanged(notifyToken);rx=nullptr;}tx=nullptr;device=nullptr;{std::lock_guard lock(frameMutex);frameBuffer.clear();}log(L"Disconnected");}
  catch(...){exception("disconnect");}
 }
 void sendRead(uint8_t opcode){
@@ -134,6 +134,7 @@ void connect(uint64_t address){
   auto status=receiver.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
   if(status!=GattCommunicationStatus::Success){receiver.ValueChanged(token);log(L"Notifications unavailable");return;}
   device=d;rx=receiver;tx=sender;notifyToken=token;active=true;
+  post(WM_APP+4,L"connected");
   log(L"Connected, requesting configuration and device information");sendRead(0x96);sendRead(0x97);
  }catch(...){exception("connect");}
 }
@@ -146,10 +147,10 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
  switch(msg){
  case WM_CREATE:{
   windowHandle=h;
-  control(L"BUTTON",L"Scan BLE",BS_PUSHBUTTON,0,0,100,35,SCAN);
-  control(L"BUTTON",L"Connect",BS_PUSHBUTTON,0,0,100,35,CONNECT);
-  control(L"BUTTON",L"Disconnect",BS_PUSHBUTTON,0,0,100,35,DISCONNECT);
-  control(L"BUTTON",L"Save RAW",BS_PUSHBUTTON,0,0,100,35,SAVE);
+  control(L"BUTTON",L"Scan BLE",BS_OWNERDRAW,0,0,100,35,SCAN);
+  control(L"BUTTON",L"Connect",BS_OWNERDRAW,0,0,100,35,CONNECT);
+  control(L"BUTTON",L"Disconnect",BS_OWNERDRAW,0,0,100,35,DISCONNECT);
+  control(L"BUTTON",L"Save RAW",BS_OWNERDRAW,0,0,100,35,SAVE);
   dashboard::setup(h,devicesList,valuesBox,logBox,protocolBox);
   RECT rect{};GetClientRect(h,&rect);
   dashboard::layout(rect.right,rect.bottom,devicesList,valuesBox,logBox,protocolBox);
@@ -159,6 +160,10 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
   dashboard::layout(LOWORD(lp),HIWORD(lp),devicesList,valuesBox,logBox,protocolBox);
   return 0;
  }
+ case WM_DRAWITEM:{
+  if(dashboard::drawButton(reinterpret_cast<DRAWITEMSTRUCT const*>(lp)))return TRUE;
+  break;
+ }
  case WM_PAINT:{
   PAINTSTRUCT ps{};HDC dc=BeginPaint(h,&ps);RECT rect{};GetClientRect(h,&rect);
   dashboard::paint(dc,rect);EndPaint(h,&ps);return 0;
@@ -167,7 +172,7 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
  case WM_CTLCOLOREDIT:
  case WM_CTLCOLORLISTBOX:{
   HDC dc=(HDC)wp;SetTextColor(dc,dashboard::fg);
-  SetBkColor(dc,dashboard::bg);
+  SetBkColor(dc,dashboard::panel);
   SetBkMode(dc,TRANSPARENT);
   return (LRESULT)dashboard::brushFor(msg);
  }
@@ -186,6 +191,7 @@ LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
   case DISCONNECT:disconnect();break;
   case SAVE:save();break;
  }return 0;
+ case WM_APP+4:{std::unique_ptr<std::wstring> state(reinterpret_cast<std::wstring*>(lp));dashboard::connected=(*state==L"connected");InvalidateRect(h,nullptr,FALSE);return 0;}
  case WM_FOUND:{std::unique_ptr<std::wstring> name(reinterpret_cast<std::wstring*>(lp));if(SendMessageW(devicesList,LB_FINDSTRINGEXACT,(WPARAM)-1,(LPARAM)name->c_str())==LB_ERR)SendMessageW(devicesList,LB_ADDSTRING,0,(LPARAM)name->c_str());return 0;}
  case WM_LOG:{std::unique_ptr<std::wstring> line(reinterpret_cast<std::wstring*>(lp));int end=GetWindowTextLengthW(logBox);SendMessageW(logBox,EM_SETSEL,end,end);auto entry=*line+L"\r\n";SendMessageW(logBox,EM_REPLACESEL,FALSE,(LPARAM)entry.c_str());return 0;}
  case WM_VALUES:{std::unique_ptr<std::wstring> value(reinterpret_cast<std::wstring*>(lp));SetWindowTextW(valuesBox,value->c_str());dashboard::update(*value);return 0;}
