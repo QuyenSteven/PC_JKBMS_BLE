@@ -4,6 +4,8 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <winrt/base.h>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Devices.Bluetooth.h>
 #include <winrt/Windows.Devices.Bluetooth.Advertisement.h>
 #include <winrt/Windows.Devices.Bluetooth.GenericAttributeProfile.h>
@@ -103,8 +105,8 @@ void sendRead(uint8_t opcode){
   for(size_t i=0;i<19;i++)frame[19]+=frame[i];
   DataWriter writer;writer.WriteBytes(frame);
   auto properties=tx.CharacteristicProperties();
-  auto opt=(properties&GattCharacteristicProperties::WriteWithoutResponse)==GattCharacteristicProperties::WriteWithoutResponse?GattWriteOption::WriteWithoutResponse:GattWriteOption::WriteWithResponse;
-  auto result=tx.WriteValueAsync(writer.DetachBuffer(),opt).get();log(L"Read request "+std::to_wstring(opcode)+L", status "+std::to_wstring((int)result));
+  auto opt=(static_cast<uint32_t>(properties)&static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse)) != 0 ? GattWriteOption::WriteWithoutResponse : GattWriteOption::WriteWithResponse;
+  auto result=tx.WriteValueAsync(writer.DetachBuffer(),opt).get();log(L"Read request "+std::to_wstring(opcode)+L", status "+std::to_wstring(static_cast<int>(result)));
  }catch(...){exception("request");}
 }
 void connect(uint64_t address){
@@ -119,8 +121,8 @@ void connect(uint64_t address){
    if(chars.Status()!=GattCommunicationStatus::Success)continue;
    for(auto const& c:chars.Characteristics()){
     auto p=c.CharacteristicProperties();
-    if((p&GattCharacteristicProperties::Notify)==GattCharacteristicProperties::Notify)receiver=c;
-    if((p&GattCharacteristicProperties::WriteWithoutResponse)==GattCharacteristicProperties::WriteWithoutResponse||(p&GattCharacteristicProperties::Write)==GattCharacteristicProperties::Write)sender=c;
+    if((static_cast<uint32_t>(p)&static_cast<uint32_t>(GattCharacteristicProperties::Notify)) != 0)receiver=c;
+    if((static_cast<uint32_t>(p)&(static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse)|static_cast<uint32_t>(GattCharacteristicProperties::Write))) != 0)sender=c;
    }
   }
   if(!receiver||!sender){log(L"Read/write FFE1 characteristics unavailable");return;}
