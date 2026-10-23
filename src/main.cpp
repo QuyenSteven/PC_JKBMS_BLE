@@ -19,6 +19,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <cmath>
+#include <stdexcept>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -189,8 +191,8 @@ void saveRaw(){
  wchar_t path[MAX_PATH]{};
  PWSTR local=nullptr;
  if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents,0,nullptr,&local))){
-  std::wstring p(local);CoTaskMemFree(local);p+=L"\\jk-bms-capture.bin";wcsncpy_s(path,p.c_str(),_TRUNCATE);
- }else wcscpy_s(path,L"jk-bms-capture.bin");
+  std::wstring p(local);CoTaskMemFree(local);p+=L"\\jk-bms-capture.bin";wcsncpy_s(path,MAX_PATH,p.c_str(),_TRUNCATE);
+ }else wcscpy_s(path,MAX_PATH,L"jk-bms-capture.bin");
  std::lock_guard lock(rawMutex);
  std::ofstream file(fs::path(path),std::ios::binary);
  if(!file){log(L"Cannot open capture output");return;}
@@ -232,6 +234,7 @@ void initBrowser(){
     [htmlPath](HRESULT result,ICoreWebView2Controller* created)->HRESULT{
      if(FAILED(result)||!created)return result;
      controller=created;controller->get_CoreWebView2(&browser);resize();
+     EventRegistrationToken webMessageToken{};
      browser->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(
       [](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs* event)->HRESULT{
        LPWSTR str=nullptr;if(FAILED(event->TryGetWebMessageAsString(&str)))return S_OK;
@@ -241,8 +244,9 @@ void initBrowser(){
         try{enqueue(L"connect",std::stoull(cmd.substr(8)));}catch(...){log(L"Invalid BLE address");}
        }
        return S_OK;
-      }).Get(),nullptr);
-     browser->Navigate(fs::path(htmlPath).c_str()==nullptr?L"about:blank":(L"file:///"+std::wstring(htmlPath)).c_str());
+      }).Get(),&webMessageToken);
+     std::wstring uri=htmlPath;std::replace(uri.begin(),uri.end(),L'\\',L'/');
+     browser->Navigate((L"file:///"+uri).c_str());
      return S_OK;
     }).Get());
   });
