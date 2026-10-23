@@ -1,20 +1,27 @@
-# JK BMS PC Studio — C++/WinRT (Windows)
+# JK BMS Studio — Native C++20 / Windows BLE
 
-Native C++20 Win32 desktop application using Windows BLE APIs. No Python, pip or PyInstaller.
+Windows 10/11 desktop application, Visual Studio 2026 (v145) or Visual Studio 2022 (v143). No Python.
 
-## Open in Visual Studio
-1. Install Visual Studio 2022 with **Desktop development with C++**, Windows 10/11 SDK and NuGet support.
-2. Open `JK_BMS_PC.vcxproj`.
-3. Choose **Release | x64**, restore NuGet packages, and Build.
-4. Enable Windows Bluetooth, start the app, click **Scan BLE**, choose the JK device and **Connect**.
+## How to run
 
-## Features in this initial version
-- Scan BLE device advertisements and connect to JK BMS GATT service `FFE0` characteristic `FFE1`.
-- Request device information and configuration, collect notifications and export raw BLE data.
-- **Experimental** live telemetry decoding for JK02_32S, JK02_24S and JK04. These decoders have NOT been validated against live devices.
-- CI workflow for Windows x64 build, artifact uploaded in Actions after a successful run.
+1. Open `JK_BMS_PC.sln` in Visual Studio.
+2. Select **Release | x64** and **Build → Rebuild Solution**.
+3. Run. Click **Scan BLE**, select the JK BMS, then **Connect**.
+4. Choose the correct protocol from the dropdown.
 
-## Safety and incomplete features
-This is an experimental **read-only** implementation. Protection parameter writes, charge/discharge MOSFET controls, balancing controls, configuration restore and BMS reboot are **not implemented or verified**. Do not use this version to change safety-critical battery settings.
+## Modern dashboard (work in progress)
 
-Protocol layouts and capabilities differ by model and firmware. Verify against real JK BMS hardware before considering full compatibility.
+- Dark layout with Overview, Cells, Control, Protection, BLE Logs.
+- Live summary: pack voltage, current, power and SOC.
+- Cell voltage bar chart, minimum/maximum and delta.
+- Charge MOSFET, discharge MOSFET and balance readouts.
+- BLE scan, connect/disconnect, FFE0/FFE1 notifications, Save RAW.
+- JK02_32S, JK02_24S and JK04 **experimental** decoding.
+
+## Important safety limitations
+
+**Read-only build.** Control and protection pages do not yet write configuration. Reboot BMS is not implemented. The settings and model-specific decoders have not been validated on real hardware, so compatibility with every JK BMS model cannot be claimed.
+
+The Windows CI workflow builds the project on a Windows runner and uploads an EXE artifact after successful compilation. Actual hardware connection and protocol correctness must be checked on the target BMS.
+
+See `.github/workflows/windows-build.yml` for CI.
