@@ -11,6 +11,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup><ClCompile><LanguageStandard>stdcpp20</LanguageStandard><WarningLevel>Level4</WarningLevel><PreprocessorDefinitions>WIN32;_WINDOWS;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile><Link><SubSystem>Windows</SubSystem><AdditionalDependencies>WindowsApp.lib;Comctl32.lib;Comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link></ItemDefinitionGroup>
   <ItemGroup><ClCompile Include="src\main.cpp" /></ItemGroup>
-  <ItemGroup><PackageReference Include="Microsoft.Windows.CppWinRT" Version="2.0.240111.5" /></ItemGroup>
+  <ItemGroup><None Include="web\index.html" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Windows.CppWinRT" Version="2.0.240111.5" /><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
