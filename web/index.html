@@ -13,19 +13,86 @@
 <button data-page="protection">⬡ &nbsp; Bảo vệ</button>
 <button data-page="diagnostics">≡ &nbsp; BLE / Nhật ký</button>
 </nav><div class="side-bottom">PHIÊN BẢN THIẾT KẾ<br>Web UI prototype 0.1<br><span class="pulse">●</span> Chưa kết nối BMS</div></aside>
-<main><header><div><h1>Quản lý hệ thống pin</h1><p class="sub">Giám sát JK BMS thời gian thực qua Bluetooth Low Energy</p></div><span class="status"><b></b> Chưa kết nối</span></header>
-<div class="actions"><button class="action primary" disabled>⌁ &nbsp; Quét BLE</button><button class="action" disabled>Kết nối</button><button class="action" disabled>Ngắt kết nối</button><button class="action" disabled>Xuất dữ liệu</button><select aria-label="Loại giao thức"><option>JK02_32S</option><option>JK02_24S</option><option>JK04</option></select></div>
-<div class="panel device"><div><div class="micro">THIẾT BỊ ĐƯỢC CHỌN</div><h2>Chưa chọn JK BMS</h2><small>Bluetooth • Đang chờ kết nối</small></div><span class="tag">OFFLINE</span></div>
+<main><header><div><h1>Quản lý hệ thống pin</h1><p class="sub">Giám sát JK BMS thời gian thực qua Bluetooth Low Energy</p></div><span class="status" id="connection-status"><b></b> Chưa kết nối</span></header>
+<div class="actions"><button id="scan" class="action primary">⌁ &nbsp; Quét BLE</button><button id="connect" class="action">Kết nối</button><button id="disconnect" class="action">Ngắt kết nối</button><button id="save" class="action">Xuất dữ liệu</button><select aria-label="Loại giao thức"><option>JK02_32S</option><option>JK02_24S</option><option>JK04</option></select></div>
+<div class="panel device"><div><div class="micro">THIẾT BỊ ĐƯỢC CHỌN</div><h2 id="device-label">Chưa chọn JK BMS</h2><small id="device-detail">Bluetooth • Đang chờ kết nối</small></div><select id="device-list" aria-label="Thiết bị tìm được"><option value="">Chọn thiết bị BLE...</option></select><span class="tag" id="device-status">OFFLINE</span></div>
 <section id="overview" class="view active">
-<div class="metrics"><div class="panel metric"><div class="label">ĐIỆN ÁP PACK</div><div class="value">--<span class="unit"> V</span></div><div class="hint">Điện áp tổng</div></div><div class="panel metric"><div class="label">DÒNG ĐIỆN</div><div class="value">--<span class="unit"> A</span></div><div class="hint">Sạc / xả</div></div><div class="panel metric"><div class="label">CÔNG SUẤT</div><div class="value">--<span class="unit"> W</span></div><div class="hint">Công suất tức thời</div></div><div class="panel metric"><div class="label">DUNG LƯỢNG SOC</div><div class="value">--<span class="unit"> %</span></div><div class="hint">Dung lượng còn lại</div></div></div>
-<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span>Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong>-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong>-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong>-- mV</strong></div></div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill">Chưa có dữ liệu</span></div></div></div>
+<div class="metrics"><div class="panel metric"><div class="label">ĐIỆN ÁP PACK</div><div id="pack-voltage" class="value">--<span class="unit"> V</span></div><div class="hint">Điện áp tổng</div></div><div class="panel metric"><div class="label">DÒNG ĐIỆN</div><div id="pack-current" class="value">--<span class="unit"> A</span></div><div class="hint">Sạc / xả</div></div><div class="panel metric"><div class="label">CÔNG SUẤT</div><div id="pack-power" class="value">--<span class="unit"> W</span></div><div class="hint">Công suất tức thời</div></div><div class="panel metric"><div class="label">DUNG LƯỢNG SOC</div><div id="pack-soc" class="value">--<span class="unit"> %</span></div><div class="hint">Dung lượng còn lại</div></div></div>
+<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span>Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill">Chưa có dữ liệu</span></div></div></div>
 </section>
 <section id="cells" class="view"><div class="panel"><div class="row-title"><h3>Phân tích điện áp cell</h3><span>Hiển thị khi có dữ liệu BLE</span></div><div class="empty">Chưa kết nối BMS. Biểu đồ sẽ hiển thị điện áp từng cell, min/max và độ lệch.</div></div></section>
 <section id="control" class="view"><div class="panel"><div class="row-title"><h3>Điều khiển BMS</h3><span class="warning">Đang khóa an toàn</span></div><div class="switchrow">Charge MOS <span class="pill">Chỉ đọc</span></div><div class="switchrow">Discharge MOS <span class="pill">Chỉ đọc</span></div><div class="switchrow">Cân bằng cell <span class="pill">Chỉ đọc</span></div><div class="switchrow">Reboot BMS <span class="pill">Chưa hỗ trợ</span></div></div></section>
 <section id="protection" class="view"><div class="panel"><div class="row-title"><h3>Cấu hình bảo vệ</h3><span>Chưa có dữ liệu đọc</span></div><div class="empty">Danh sách OVP, UVP, OCP, nhiệt độ và độ trễ sẽ được hiển thị sau khi tích hợp bộ giải mã cấu hình.</div></div></section>
-<section id="diagnostics" class="view"><div class="panel"><div class="row-title"><h3>Nhật ký BLE</h3><span>Chưa có dữ liệu</span></div><textarea class="log" readonly placeholder="Kết nối thiết bị để nhận nhật ký BLE..."></textarea></div></section>
-<div class="footnote">Bản thiết kế giao diện HTML/CSS. Các nút kết nối và ghi BMS chưa được nối với C++ BLE. Không có dữ liệu giả được hiển thị như dữ liệu thật.</div>
+<section id="diagnostics" class="view"><div class="panel"><div class="row-title"><h3>Nhật ký BLE</h3><span>Chưa có dữ liệu</span></div><textarea class="log" id="ble-log" readonly placeholder="Kết nối thiết bị để nhận nhật ký BLE..."></textarea></div></section>
+<div class="footnote" id="safety">Giám sát BLE trực tiếp. Chế độ đọc an toàn: các lệnh ghi bảo vệ, điều khiển MOSFET và reboot chưa được mở khi chưa xác minh firmware.</div>
 </main></div><script>
-const nav=document.querySelectorAll('[data-page]');nav.forEach(b=>b.addEventListener('click',()=>{nav.forEach(n=>n.classList.toggle('active',n===b));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===b.dataset.page));}));
-const cells=document.getElementById('cells-preview');for(let i=1;i<=16;i++){let el=document.createElement('div');el.className='cell';el.innerHTML='<div class="n">CELL '+String(i).padStart(2,'0')+'</div><div class="v">-- V</div>';cells.appendChild(el);}
+'use strict';
+const $=id=>document.getElementById(id);
+const buttons=document.querySelectorAll('[data-page]');
+buttons.forEach(b=>b.addEventListener('click',()=>{
+ buttons.forEach(n=>n.classList.toggle('active',n===b));
+ document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===b.dataset.page));
+}));
+function send(cmd){if(window.chrome?.webview)window.chrome.webview.postMessage(cmd);else note('Ứng dụng WebView2 chưa kết nối; hãy mở từ chương trình C++.');}
+function note(message){const log=$('ble-log');log.value+=(log.value?'\n':'')+new Date().toLocaleTimeString()+'  '+message;log.scrollTop=log.scrollHeight;}
+const devices=new Map();
+$('scan').addEventListener('click',()=>send('scan'));
+$('disconnect').addEventListener('click',()=>send('disconnect'));
+$('save').addEventListener('click',()=>send('save'));
+$('connect').addEventListener('click',()=>{
+ const value=$('device-list').value;
+ if(!value){note('Vui lòng chọn thiết bị trước khi kết nối.');return;}
+ send('connect:'+value);
+});
+$('device-list').addEventListener('change',()=>{
+ let id=$('device-list').value,d=devices.get(id);
+ $('device-label').textContent=d?d.name:'Chưa chọn JK BMS';
+ $('device-detail').textContent=d?'BLE '+d.mac:'Bluetooth • Đang chờ kết nối';
+});
+function mark(id,on){$(id).textContent=on?'BẬT':'TẮT';$(id).style.color=on?'#64e3bb':'#ffba8e';}
+function telemetry(t){
+ if(t.protocol!==document.querySelector('select[aria-label="Loại giao thức"]').value){
+  note('Nhận dữ liệu dạng '+t.protocol+'; bộ giải mã giao thức khác chưa xác thực.');
+  return;
+ }
+ const value=(id,v,unit,digits)=>$(id).innerHTML=(Number.isFinite(v)?Number(v).toFixed(digits):'--')+'<span class="unit"> '+unit+'</span>';
+ value('pack-voltage',t.voltage,'V',2);value('pack-current',t.current,'A',2);
+ value('pack-power',t.power,'W',0);value('pack-soc',t.soc,'%',0);
+ mark('charge-state',t.charge===1);mark('discharge-state',t.discharge===1);mark('balance-state',t.balance===1);
+ const cells=t.cells||[];
+ const holder=$('cells-preview');holder.replaceChildren();
+ cells.forEach((v,i)=>{
+  const element=document.createElement('div');element.className='cell';
+  const number=document.createElement('div');number.className='n';number.textContent='CELL '+String(i+1).padStart(2,'0');
+  const voltage=document.createElement('div');voltage.className='v';voltage.textContent=v.toFixed(3)+' V';
+  element.append(number,voltage);holder.append(element);
+ });
+ if(cells.length){
+  const min=Math.min(...cells),max=Math.max(...cells);
+  $('min-cell').textContent=min.toFixed(3)+' V';$('max-cell').textContent=max.toFixed(3)+' V';
+  $('delta-cell').textContent=((max-min)*1000).toFixed(0)+' mV';
+  document.querySelector('#overview .row-title span').textContent=cells.length+' cell đang hoạt động';
+  $('cells').querySelector('.empty').textContent=cells.map((v,i)=>'Cell '+(i+1)+': '+v.toFixed(3)+' V').join('   |   ');
+ }
+}
+function receive(event){
+ let data=event.data;if(typeof data==='string'){try{data=JSON.parse(data);}catch{return;}}
+ switch(data.type){
+ case 'log':note(data.message);break;
+ case 'clearDevices':devices.clear();$('device-list').innerHTML='<option value="">Chọn thiết bị BLE...</option>';break;
+ case 'device':{
+  if(devices.has(data.address))break;devices.set(data.address,data);
+  const option=document.createElement('option');option.value=data.address;option.textContent=data.name+' ['+data.mac+']';
+  $('device-list').appendChild(option);break;
+ }
+ case 'status':{
+  let online=data.message==='connected';$('connection-status').innerHTML='<b></b> '+(online?'Đã kết nối':data.message==='connecting'?'Đang kết nối':'Chưa kết nối');
+  $('device-status').textContent=online?'ONLINE':'OFFLINE';break;
+ }
+ case 'frame':if(data.message.startsWith('0x02'))note('Nhận telemetry '+data.message);else note('Nhận '+data.message);break;
+ case 'telemetry':telemetry(data);break;
+ }
+}
+if(window.chrome?.webview)window.chrome.webview.addEventListener('message',receive);
+else note('Đang xem HTML mẫu độc lập; chưa kết nối được với Bluetooth C++.');
 </script></body></html>
