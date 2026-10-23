@@ -145,8 +145,8 @@ inline void paint(HDC dc,RECT client){
   text(dc,x+6,541,L"DEVICE TELEMETRY",muted,fontSmall);
  } else if(page==Cells){
   text(dc,x+12,234,L"CELL VOLTAGE COMPARISON",muted,fontMedium);
-  fillRound(dc,{x,298,x+w,std::min(client.bottom-184,638)},panel);
-  int baseline=std::min(client.bottom-203,610), graphH=220;
+  fillRound(dc,{x,298,x+w,std::min(static_cast<int>(client.bottom)-184,638)},panel);
+  int baseline=std::min(static_cast<int>(client.bottom)-203,610), graphH=220;
   if(!cellVoltages.empty()&&baseline>345){
    auto mm=std::minmax_element(cellVoltages.begin(),cellVoltages.end());double lo=std::max(0.0,*mm.first-0.06),hi=*mm.second+0.06;
    int barWidth=std::max(4,(w-40)/(int)cellVoltages.size()-5);
