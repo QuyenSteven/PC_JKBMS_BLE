@@ -1,20 +1,21 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
-#include <commctrl.h>
-#include <commdlg.h>
+#include <shlobj.h>
+#include <wrl.h>
+#include <WebView2.h>
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Devices.Bluetooth.h>
 #include <winrt/Windows.Devices.Bluetooth.Advertisement.h>
 #include <winrt/Windows.Devices.Bluetooth.GenericAttributeProfile.h>
 #include <winrt/Windows.Storage.Streams.h>
-#include <algorithm>
 #include <atomic>
-#include <cmath>
+#include <algorithm>
+#include <array>
+#include <condition_variable>
 #include <cstdint>
-#include <cstring>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -25,193 +26,251 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "dashboard.h"
-#pragma comment(lib,"Comctl32.lib")
-#pragma comment(lib,"Comdlg32.lib")
 #pragma comment(lib,"WindowsApp.lib")
+#pragma comment(lib,"Ole32.lib")
+#pragma comment(lib,"Shell32.lib")
 using namespace winrt;
-using namespace Windows::Devices::Bluetooth;
-using namespace Windows::Devices::Bluetooth::Advertisement;
-using namespace Windows::Devices::Bluetooth::GenericAttributeProfile;
-using namespace Windows::Storage::Streams;
-constexpr UINT WM_FOUND=WM_APP+1, WM_LOG=WM_APP+2, WM_VALUES=WM_APP+3;
-constexpr int SCAN=101, CONNECT=102, DISCONNECT=103, SAVE=104, DEVICES=105, PROTOCOL=106;
-HWND windowHandle{}, devicesList{}, valuesBox{}, logBox{}, protocolBox{};
-std::mutex devicesMutex, frameMutex, logMutex;
-std::map<std::wstring,uint64_t> discovered;
-std::vector<uint8_t> frameBuffer, rawCapture;
-std::atomic<bool> active{false};
-std::atomic<unsigned> seq{0};
-std::atomic<unsigned> cellFrames{0};
-std::atomic<unsigned> rxFrames{0};
+using namespace winrt::Windows::Devices::Bluetooth;
+using namespace winrt::Windows::Devices::Bluetooth::Advertisement;
+using namespace winrt::Windows::Devices::Bluetooth::GenericAttributeProfile;
+using namespace winrt::Windows::Storage::Streams;
+using Microsoft::WRL::Callback;
+using Microsoft::WRL::ComPtr;
+namespace fs=std::filesystem;
+constexpr UINT WM_EVENT=WM_APP+42;
+struct UiEvent {std::wstring json;};
+HWND hwnd{};
+ComPtr<ICoreWebView2Controller> controller;
+ComPtr<ICoreWebView2> browser;
+std::atomic<bool> running{true};
+std::mutex queueMutex,deviceMutex,rawMutex;
+std::condition_variable queueReady;
+struct Command {std::wstring action;uint64_t address=0;};
+std::deque<Command> commands;
+std::map<uint64_t,std::wstring> addresses;
+std::vector<uint8_t> rawBytes;
 BluetoothLEAdvertisementWatcher watcher{nullptr};
-BluetoothLEDevice device{nullptr};
-GattCharacteristic rx{nullptr}, tx{nullptr};
-event_token watchToken{}, notifyToken{};
-const guid serviceUuid{0x0000FFE0,0x0000,0x1000,{0x80,0x00,0x00,0x80,0x5F,0x9B,0x34,0xFB}};
-const guid charUuid{0x0000FFE1,0x0000,0x1000,{0x80,0x00,0x00,0x80,0x5F,0x9B,0x34,0xFB}};
-void post(UINT type,std::wstring message){if(windowHandle&&IsWindow(windowHandle)) PostMessageW(windowHandle,type,0,reinterpret_cast<LPARAM>(new std::wstring(std::move(message))));}
-void log(std::wstring text){post(WM_LOG,std::move(text));}
-std::wstring utf8(std::string text){if(text.empty())return {};int n=MultiByteToWideChar(CP_UTF8,0,text.data(),(int)text.size(),nullptr,0);std::wstring output(n,L' ');MultiByteToWideChar(CP_UTF8,0,text.data(),(int)text.size(),output.data(),n);return output;}
-void exception(char const* context){try{throw;}catch(hresult_error const& e){log(utf8(context)+L": "+std::wstring(e.message().c_str()));}catch(std::exception const& e){log(utf8(context)+L": "+utf8(e.what()));}catch(...){log(utf8(context)+L": unknown error");}}
-uint16_t u16(std::vector<uint8_t> const& b,size_t p){return p+1<b.size()?uint16_t(b[p]|b[p+1]<<8):0;}
-uint32_t u32(std::vector<uint8_t> const& b,size_t p){return p+3<b.size()?uint32_t(b[p])|(uint32_t(b[p+1])<<8)|(uint32_t(b[p+2])<<16)|(uint32_t(b[p+3])<<24):0;}
-float f32(std::vector<uint8_t> const& b,size_t p){uint32_t bits=u32(b,p);float value{};memcpy(&value,&bits,4);return value;}
-std::wstring parse(std::vector<uint8_t> const& b,int mode){
- if(b.size()<300||b[4]!=2)return L"";
- std::wostringstream os;os<<std::fixed<<std::setprecision(3);
- if(mode==2){os<<L"JK04 experimental cell decode\r\n";for(int i=0;i<24;i++){float v=f32(b,6+4*i);if(std::isfinite(v)&&v>.5f&&v<5.5f)os<<L"Cell "<<i+1<<L": "<<v<<L" V\r\n";}return os.str();}
- int delta=mode==1?-16:0;double voltage=u32(b,150+delta)/1000.0;double current=(int32_t)u32(b,154+delta)/1000.0;
- if(voltage>2000||std::abs(current)>50000)return L"Invalid frame values";
- os<<L"Pack "<<voltage<<L" V | "<<current<<L" A | "<<voltage*current<<L" W\r\n";
- os<<L"SOC "<<(int)b[173+delta]<<L"% | Charge MOS "<<(int)b[198+delta]<<L" | Discharge MOS "<<(int)b[199+delta]<<L" | Balance "<<(int)b[201+delta]<<L"\r\n";
- for(int i=0;i<(mode==1?24:32);i++){auto mv=u16(b,6+i*2);if(mv>=500&&mv<=5500)os<<L"Cell "<<i+1<<L": "<<mv/1000.0<<L" V\r\n";}
- return os.str();
+BluetoothLEDevice bms{nullptr};
+GattCharacteristic notifyChar{nullptr},writeChar{nullptr};
+winrt::event_token notifyToken{},watchToken{};
+uint8_t requestSequence=0;
+std::wstring status=L"disconnected";
+std::wstring jsonEscape(std::wstring const& input){
+ std::wstring out;out.reserve(input.size()+16);
+ for(auto ch:input){switch(ch){
+ case L'\\':out+=L"\\\\";break;case L'"':out+=L"\\\"";break;case L'\n':out+=L"\\n";break;
+ case L'\r':out+=L"\\r";break;case L'\t':out+=L"\\t";break;
+ default:if(ch>=32)out+=ch;break;
+ }}return out;
 }
-void parseChunk(std::vector<uint8_t> const& bytes){
- {std::lock_guard lock(logMutex);rawCapture.insert(rawCapture.end(),bytes.begin(),bytes.end());}
- std::lock_guard lock(frameMutex);frameBuffer.insert(frameBuffer.end(),bytes.begin(),bytes.end());
- const uint8_t signature[]={0x55,0xAA,0xEB,0x90};
- while(true){
-  auto start=std::search(frameBuffer.begin(),frameBuffer.end(),std::begin(signature),std::end(signature));
-  if(start!=frameBuffer.begin())frameBuffer.erase(frameBuffer.begin(),start);
+void emit(std::wstring json){auto ptr=new UiEvent{std::move(json)};if(!hwnd||!PostMessageW(hwnd,WM_EVENT,0,(LPARAM)ptr))delete ptr;}
+void field(std::wstring const& type,std::wstring const& value){emit(L"{\"type\":\""+type+L"\",\"message\":\""+jsonEscape(value)+L"\"}");}
+void log(std::wstring text){field(L"log",text);}
+std::wstring hex(uint64_t v){std::wstringstream s;s<<std::hex<<std::uppercase<<std::setw(12)<<std::setfill(L'0')<<v;return s.str();}
+std::wstring winrtError(){try{throw;}catch(winrt::hresult_error const& e){return e.message().c_str();}catch(std::exception const& e){std::wstring w;std::string s=e.what();w.assign(s.begin(),s.end());return w;}catch(...){return L"Unexpected exception";}}
+void enqueue(std::wstring action,uint64_t address=0){{std::lock_guard lock(queueMutex);commands.push_back({std::move(action),address});}queueReady.notify_one();}
+void stopScanner(){
+ if(watcher){try{watcher.Stop();}catch(...){}try{watcher.Received(watchToken);}catch(...){}watcher=nullptr;}
+}
+void disconnectBms(){
+ stopScanner();
+ if(notifyChar){try{notifyChar.ValueChanged(notifyToken);}catch(...){}}
+ notifyChar=nullptr;writeChar=nullptr;bms=nullptr;
+ status=L"disconnected";field(L"status",status);log(L"Disconnected");
+}
+void scanBms(){
+ stopScanner();{
+  std::lock_guard lock(deviceMutex);addresses.clear();
+ }
+ emit(L"{\"type\":\"clearDevices\"}");
+ watcher=BluetoothLEAdvertisementWatcher();
+ watcher.ScanningMode(BluetoothLEScanningMode::Active);
+ watchToken=watcher.Received([](auto const&,BluetoothLEAdvertisementReceivedEventArgs const& args){
+  try{
+   std::wstring name(args.Advertisement().LocalName().c_str());if(name.empty())return;
+   uint64_t address=args.BluetoothAddress();
+   {std::lock_guard lock(deviceMutex);addresses[address]=name;}
+   emit(L"{\"type\":\"device\",\"address\":\""+std::to_wstring(address)+L"\",\"name\":\""+jsonEscape(name)+L"\",\"mac\":\""+hex(address)+L"\"}");
+  }catch(...){}
+ });
+ watcher.Start();log(L"Scanning BLE advertisements...");
+}
+constexpr winrt::guid service{0x0000FFE0,0,0x1000,{0x80,0,0,0,0x80,0x5F,0x9B,0x34,0xFB}};
+constexpr winrt::guid characteristic{0x0000FFE1,0,0x1000,{0x80,0,0,0,0x80,0x5F,0x9B,0x34,0xFB}};
+std::vector<uint8_t> frameBuffer;
+void parseFrame(std::vector<uint8_t> const& b){
+ if(b.size()!=300&&b.size()!=320)return;
+ uint8_t type=b[4];
+ field(L"frame",L"0x0"+std::to_wstring(type)+L" ("+std::to_wstring(b.size())+L" bytes)");
+ if(type!=2)return;
+ // Only 32S offsets are decoded in this stage; do not report measurements for unverified layouts.
+ auto u16=[&](size_t o)->uint16_t{return uint16_t(b[o]|uint16_t(b[o+1])<<8);};
+ auto u32=[&](size_t o)->uint32_t{return uint32_t(b[o])|(uint32_t(b[o+1])<<8)|(uint32_t(b[o+2])<<16)|(uint32_t(b[o+3])<<24);};
+ std::wstringstream s;s<<L"{\"type\":\"telemetry\",\"protocol\":\"JK02_32S\",\"cells\":[";
+ bool first=true;double min=10,max=0;unsigned n=0;
+ uint32_t enabled=u32(70);
+ for(unsigned i=0;i<32;i++){if(!(enabled&(1u<<i)))continue;
+  double v=u16(6+i*2)*.001;if(v<1.0||v>5.0)continue;
+  if(!first)s<<L",";s<<std::fixed<<std::setprecision(3)<<v;first=false;
+  min=std::min(min,v);max=std::max(max,v);n++;
+ }
+ s<<L"],\"count\":"<<n<<L",\"deltaMv\":"<<std::llround((max-min)*1000);
+ double voltage=u32(150)*.001;
+ double current=(int32_t)u32(154)*.001;
+ if(voltage<0||voltage>2000||current < -5000 ||current>5000){log(L"Telemetry rejected: implausible pack values");return;}
+ s<<L",\"voltage\":"<<std::fixed<<std::setprecision(3)<<voltage;
+ s<<L",\"current\":"<<current<<L",\"power\":"<<voltage*current<<L",\"soc\":"<<(unsigned)b[173];
+ s<<L",\"charge\":"<<(unsigned)b[198]<<L",\"discharge\":"<<(unsigned)b[199]<<L",\"balance\":"<<(unsigned)b[201]<<L"}";
+ emit(s.str());
+}
+void feed(std::vector<uint8_t> const& chunk){
+ {std::lock_guard lock(rawMutex);rawBytes.insert(rawBytes.end(),chunk.begin(),chunk.end());}
+ frameBuffer.insert(frameBuffer.end(),chunk.begin(),chunk.end());
+ constexpr std::array<uint8_t,4> prefix{0x55,0xAA,0xEB,0x90};
+ while(frameBuffer.size()>=4){
+  auto found=std::search(frameBuffer.begin(),frameBuffer.end(),prefix.begin(),prefix.end());
+  if(found!=frameBuffer.begin())frameBuffer.erase(frameBuffer.begin(),found);
   if(frameBuffer.size()<300)break;
-  auto valid=[&](size_t len){uint8_t checksum=0;for(size_t i=0;i<len-1;i++)checksum+=frameBuffer[i];return checksum==frameBuffer[len-1];};
-  size_t len=300;
-  if(!valid(300)){if(frameBuffer.size()<320)break;if(valid(320))len=320;else{static unsigned invalidCount=0;if(++invalidCount%10==1)log(L"BLE frame CRC mismatch; check model/protocol or fragment assembly");frameBuffer.erase(frameBuffer.begin());continue;}}
-  std::vector<uint8_t> frame(frameBuffer.begin(),frameBuffer.begin()+len);frameBuffer.erase(frameBuffer.begin(),frameBuffer.begin()+len);
-  rxFrames.fetch_add(1);
-  if(frame[4]==2){cellFrames.fetch_add(1);int mode=0;if(protocolBox)mode=(int)SendMessageW(protocolBox,CB_GETCURSEL,0,0);post(WM_VALUES,parse(frame,mode));}
-  else if(frame[4]==1)log(L"Settings frame received: "+std::to_wstring(len)+L" bytes");
-  else if(frame[4]==3)log(L"Device info received: "+std::to_wstring(len)+L" bytes");
+  auto good=[&](size_t size){if(frameBuffer.size()<size)return false;uint8_t sum=0;for(size_t i=0;i<size-1;i++)sum=uint8_t(sum+frameBuffer[i]);return sum==frameBuffer[size-1];};
+  size_t length=0;if(good(300))length=300;else if(good(320))length=320;
+  if(!length){if(frameBuffer.size()<320)break;log(L"Invalid BLE frame checksum / unsupported frame length");frameBuffer.erase(frameBuffer.begin());continue;}
+  std::vector<uint8_t> frame(frameBuffer.begin(),frameBuffer.begin()+length);
+  frameBuffer.erase(frameBuffer.begin(),frameBuffer.begin()+length);
+  parseFrame(frame);
  }
- if(frameBuffer.size()>1024)frameBuffer.clear();
+ if(frameBuffer.size()>2048){frameBuffer.clear();log(L"Frame assembler reset after overflow");}
 }
-void stopScan(){try{if(watcher&&watcher.Status()==BluetoothLEAdvertisementWatcherStatus::Started)watcher.Stop();}catch(...){}}
-void scan(){
- try{
-  stopScan();watcher=BluetoothLEAdvertisementWatcher();watcher.ScanningMode(BluetoothLEScanningMode::Active);
-  watchToken=watcher.Received([](auto const&,BluetoothLEAdvertisementReceivedEventArgs const& e){
-   auto name=std::wstring(e.Advertisement().LocalName().c_str());if(name.empty())return;
-   auto address=e.BluetoothAddress();std::wostringstream os;os<<name<<L" ["<<std::hex<<std::uppercase<<std::setw(12)<<std::setfill(L'0')<<address<<L"]";
-   auto label=os.str();{std::lock_guard lock(devicesMutex);discovered[label]=address;}post(WM_FOUND,label);
-  });
-  watcher.Start();log(L"Scanning BLE...");
- }catch(...){exception("scan");}
+void sendRead(uint8_t command){
+ if(!writeChar)return;
+ std::array<uint8_t,20> bytes{};bytes[0]=0xAA;bytes[1]=0x55;bytes[2]=0x90;bytes[3]=0xEB;bytes[4]=command;bytes[16]=requestSequence++;
+ for(int i=0;i<19;i++)bytes[19]=uint8_t(bytes[19]+bytes[i]);
+ DataWriter writer;writer.WriteBytes(bytes);
+ auto props=static_cast<uint32_t>(writeChar.CharacteristicProperties());
+ auto option=(props&static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse))?
+  GattWriteOption::WriteWithoutResponse:GattWriteOption::WriteWithResponse;
+ auto result=writeChar.WriteValueAsync(writer.DetachBuffer(),option).get();
+ log(L"TX 0x"+hex(command).substr(10)+L" result "+std::to_wstring(static_cast<int>(result)));
 }
-void disconnect(){
- try{active=false;KillTimer(windowHandle,7001);cellFrames=0;post(WM_APP+4,L"disconnected");stopScan();if(rx){rx.ValueChanged(notifyToken);rx=nullptr;}tx=nullptr;device=nullptr;{std::lock_guard lock(frameMutex);frameBuffer.clear();}log(L"Disconnected");}
- catch(...){exception("disconnect");}
-}
-void sendRead(uint8_t opcode){
- try{
-  if(!tx)return;std::vector<uint8_t> frame(20,0);frame[0]=0xAA;frame[1]=0x55;frame[2]=0x90;frame[3]=0xEB;frame[4]=opcode;frame[16]=0; // JK BLE read requests use reserved zero; checksum calculated below
-  for(size_t i=0;i<19;i++)frame[19]+=frame[i];
-  DataWriter writer;writer.WriteBytes(frame);
-  auto properties=tx.CharacteristicProperties();
-  auto opt=(static_cast<uint32_t>(properties)&static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse)) != 0 ? GattWriteOption::WriteWithoutResponse : GattWriteOption::WriteWithResponse;
-  auto result=tx.WriteValueAsync(writer.DetachBuffer(),opt).get();log(L"Read request "+std::to_wstring(opcode)+L", status "+std::to_wstring(static_cast<int>(result)));
- }catch(...){exception("request");}
-}
-void connect(uint64_t address){
- try{
-  init_apartment(apartment_type::multi_threaded);log(L"Connecting to JK BLE...");
-  auto d=BluetoothLEDevice::FromBluetoothAddressAsync(address).get();if(!d){log(L"Unable to open device");return;}
-  auto services=d.GetGattServicesForUuidAsync(serviceUuid,BluetoothCacheMode::Uncached).get();
-  if(services.Status()!=GattCommunicationStatus::Success||services.Services().Size()==0){log(L"Service FFE0 not found");return;}
-  GattCharacteristic receiver{nullptr},sender{nullptr};
-  for(auto const& s:services.Services()){
-   auto chars=s.GetCharacteristicsForUuidAsync(charUuid,BluetoothCacheMode::Uncached).get();
-   if(chars.Status()!=GattCommunicationStatus::Success)continue;
-   for(auto const& c:chars.Characteristics()){
-    auto p=c.CharacteristicProperties();
-    if((static_cast<uint32_t>(p)&static_cast<uint32_t>(GattCharacteristicProperties::Notify)) != 0)receiver=c;
-    if((static_cast<uint32_t>(p)&(static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse)|static_cast<uint32_t>(GattCharacteristicProperties::Write))) != 0)sender=c;
-   }
+void connectBms(uint64_t address){
+ disconnectBms();status=L"connecting";field(L"status",status);
+ log(L"Connecting to "+hex(address));
+ auto target=BluetoothLEDevice::FromBluetoothAddressAsync(address).get();
+ if(!target)throw std::runtime_error("BluetoothLEDevice not found");
+ auto services=target.GetGattServicesForUuidAsync(service,BluetoothCacheMode::Uncached).get();
+ if(services.Status()!=GattCommunicationStatus::Success||services.Services().Size()==0)throw std::runtime_error("BLE service FFE0 not found");
+ GattCharacteristic recv{nullptr},send{nullptr};
+ for(auto const& svc:services.Services()){
+  auto chars=svc.GetCharacteristicsForUuidAsync(characteristic,BluetoothCacheMode::Uncached).get();
+  if(chars.Status()!=GattCommunicationStatus::Success)continue;
+  for(auto const& c:chars.Characteristics()){
+   auto flags=static_cast<uint32_t>(c.CharacteristicProperties());
+   if(flags&static_cast<uint32_t>(GattCharacteristicProperties::Notify))recv=c;
+   if(flags&(static_cast<uint32_t>(GattCharacteristicProperties::Write)|static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse)))send=c;
   }
-  if(!receiver||!sender){log(L"Read/write FFE1 characteristics unavailable");return;}
-  auto token=receiver.ValueChanged([](auto const&,GattValueChangedEventArgs const& e){
-   try{auto reader=DataReader::FromBuffer(e.CharacteristicValue());std::vector<uint8_t> bytes(reader.UnconsumedBufferLength());reader.ReadBytes(bytes);parseChunk(bytes);}
-   catch(...){exception("notification");}
+ }
+ if(!recv||!send)throw std::runtime_error("BLE FFE1 GATT notification/write channels missing");
+ // Device, write and callback references all stay alive on the BLE worker.
+ bms=target;notifyChar=recv;writeChar=send;
+ notifyToken=notifyChar.ValueChanged([](auto const&,GattValueChangedEventArgs const& args){
+  try{
+   auto buffer=args.CharacteristicValue();
+   DataReader reader=DataReader::FromBuffer(buffer);
+   std::vector<uint8_t> chunk(reader.UnconsumedBufferLength());
+   reader.ReadBytes(chunk);feed(chunk);
+  }catch(...){log(L"BLE RX exception: "+winrtError());}
+ });
+ auto result=notifyChar.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
+ if(result!=GattCommunicationStatus::Success)throw std::runtime_error("Failed to enable BLE notifications");
+ status=L"connected";field(L"status",status);log(L"BLE notifications enabled");
+ sendRead(0x96);sendRead(0x97);
+ log(L"Waiting for periodic frame 0x02 (cell telemetry).");
+}
+void saveRaw(){
+ wchar_t path[MAX_PATH]{};
+ PWSTR local=nullptr;
+ if(SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents,0,nullptr,&local))){
+  std::wstring p(local);CoTaskMemFree(local);p+=L"\\jk-bms-capture.bin";wcsncpy_s(path,p.c_str(),_TRUNCATE);
+ }else wcscpy_s(path,L"jk-bms-capture.bin");
+ std::lock_guard lock(rawMutex);
+ std::ofstream file(fs::path(path),std::ios::binary);
+ if(!file){log(L"Cannot open capture output");return;}
+ file.write(reinterpret_cast<char const*>(rawBytes.data()),static_cast<std::streamsize>(rawBytes.size()));
+ log(L"RAW saved: "+std::wstring(path));
+}
+void bleWorker(){
+ try{
+  winrt::init_apartment(winrt::apartment_type::multi_threaded);
+  while(running){
+   Command cmd;
+   {std::unique_lock lock(queueMutex);queueReady.wait(lock,[]{return !running||!commands.empty();});if(!running)break;cmd=commands.front();commands.pop_front();}
+   try{
+    if(cmd.action==L"scan")scanBms();
+    else if(cmd.action==L"connect")connectBms(cmd.address);
+    else if(cmd.action==L"disconnect")disconnectBms();
+    else if(cmd.action==L"save")saveRaw();
+   }catch(...){log(L"BLE: "+winrtError());if(cmd.action==L"connect")disconnectBms();}
+  }
+  disconnectBms();
+ }catch(...){log(L"BLE worker failed: "+winrtError());}
+}
+std::thread bleThread;
+void resize(){
+ if(!controller||!hwnd)return;RECT rect{};GetClientRect(hwnd,&rect);controller->put_Bounds(rect);
+}
+void initBrowser(){
+ fs::path executable;
+ wchar_t exe[MAX_PATH]{};GetModuleFileNameW(nullptr,exe,MAX_PATH);
+ executable=fs::path(exe).parent_path();
+ fs::path page=executable/L"web"/L"index.html";
+ if(!fs::exists(page))page=executable.parent_path().parent_path()/L"web"/L"index.html";
+ if(!fs::exists(page)){MessageBoxW(hwnd,L"web/index.html not found next to executable. Copy the web directory next to the exe.",L"JK BMS",MB_ICONERROR);return;}
+ auto htmlPath=page.wstring();
+ auto cb=Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
+  [htmlPath](HRESULT hr,ICoreWebView2Environment* env)->HRESULT{
+   if(FAILED(hr)||!env){MessageBoxW(hwnd,L"WebView2 Runtime unavailable.",L"JK BMS",MB_ICONERROR);return FAILED(hr)?hr:E_FAIL;}
+   return env->CreateCoreWebView2Controller(hwnd,Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+    [htmlPath](HRESULT result,ICoreWebView2Controller* created)->HRESULT{
+     if(FAILED(result)||!created)return result;
+     controller=created;controller->get_CoreWebView2(&browser);resize();
+     browser->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>(
+      [](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs* event)->HRESULT{
+       LPWSTR str=nullptr;if(FAILED(event->TryGetWebMessageAsString(&str)))return S_OK;
+       std::wstring cmd(str);CoTaskMemFree(str);
+       if(cmd==L"scan"||cmd==L"disconnect"||cmd==L"save")enqueue(cmd);
+       else if(cmd.rfind(L"connect:",0)==0){
+        try{enqueue(L"connect",std::stoull(cmd.substr(8)));}catch(...){log(L"Invalid BLE address");}
+       }
+       return S_OK;
+      }).Get(),nullptr);
+     browser->Navigate(fs::path(htmlPath).c_str()==nullptr?L"about:blank":(L"file:///"+std::wstring(htmlPath)).c_str());
+     return S_OK;
+    }).Get());
   });
-  auto status=receiver.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
-  if(status!=GattCommunicationStatus::Success){receiver.ValueChanged(token);log(L"Notifications unavailable");return;}
-  device=d;rx=receiver;tx=sender;notifyToken=token;active=true;
-  post(WM_APP+4,L"connected");
-  log(L"Connected, requesting cell telemetry and device information");sendRead(0x96);sendRead(0x97);
-  PostMessageW(windowHandle,WM_APP+5,0,0);
- }catch(...){exception("connect");}
+ HRESULT result=CreateCoreWebView2EnvironmentWithOptions(nullptr,nullptr,nullptr,cb.Get());
+ if(FAILED(result))MessageBoxW(hwnd,L"Failed to initialize WebView2 Runtime.",L"JK BMS",MB_ICONERROR);
 }
-void save(){
- OPENFILENAMEW dialog{};wchar_t filename[MAX_PATH]=L"jk-bms-ble-raw.bin";dialog.lStructSize=sizeof(dialog);dialog.hwndOwner=windowHandle;dialog.lpstrFile=filename;dialog.nMaxFile=MAX_PATH;dialog.lpstrFilter=L"Binary (*.bin)\0*.bin\0All (*.*)\0*.*\0";dialog.Flags=OFN_OVERWRITEPROMPT;dialog.lpstrDefExt=L"bin";
- if(GetSaveFileNameW(&dialog)){std::lock_guard lock(logMutex);std::ofstream out(std::filesystem::path(filename),std::ios::binary);out.write(reinterpret_cast<char const*>(rawCapture.data()),(std::streamsize)rawCapture.size());log(L"Saved raw capture");}
-}
-HWND control(wchar_t const* cls,wchar_t const* text,DWORD style,int x,int y,int w,int h,int id=0){return CreateWindowExW(0,cls,text,WS_CHILD|WS_VISIBLE|style,x,y,w,h,windowHandle,(HMENU)(INT_PTR)id,GetModuleHandleW(nullptr),nullptr);}
-LRESULT CALLBACK procedure(HWND h,UINT msg,WPARAM wp,LPARAM lp){
+LRESULT CALLBACK wndProc(HWND w,UINT msg,WPARAM wp,LPARAM lp){
  switch(msg){
- case WM_CREATE:{
-  windowHandle=h;
-  control(L"BUTTON",L"Scan BLE",BS_OWNERDRAW,0,0,100,35,SCAN);
-  control(L"BUTTON",L"Connect",BS_OWNERDRAW,0,0,100,35,CONNECT);
-  control(L"BUTTON",L"Disconnect",BS_OWNERDRAW,0,0,100,35,DISCONNECT);
-  control(L"BUTTON",L"Save RAW",BS_OWNERDRAW,0,0,100,35,SAVE);
-  dashboard::setup(h,devicesList,valuesBox,logBox,protocolBox);
-  RECT rect{};GetClientRect(h,&rect);
-  dashboard::layout(rect.right,rect.bottom,devicesList,valuesBox,logBox,protocolBox);
+ case WM_CREATE:hwnd=w;initBrowser();return 0;
+ case WM_SIZE:resize();return 0;
+ case WM_EVENT:{
+  std::unique_ptr<UiEvent> ev(reinterpret_cast<UiEvent*>(lp));
+  if(browser)browser->PostWebMessageAsJson(ev->json.c_str());
   return 0;
  }
- case WM_APP+5:{SetTimer(h,7001,5000,nullptr);return 0;}
- case WM_TIMER:{if(wp==7001 && active && cellFrames.load()==0){
-   log(L"No cell telemetry yet: retrying 0x96 read request");
-   std::thread([]{init_apartment(apartment_type::multi_threaded);sendRead(0x96);}).detach();
-  }return 0;}
- case WM_SIZE:{
-  dashboard::layout(LOWORD(lp),HIWORD(lp),devicesList,valuesBox,logBox,protocolBox);
-  return 0;
- }
- case WM_DRAWITEM:{
-  if(dashboard::drawButton(reinterpret_cast<DRAWITEMSTRUCT const*>(lp)))return TRUE;
-  break;
- }
- case WM_PAINT:{
-  PAINTSTRUCT ps{};HDC dc=BeginPaint(h,&ps);RECT rect{};GetClientRect(h,&rect);
-  dashboard::paint(dc,rect);EndPaint(h,&ps);return 0;
- }
- case WM_CTLCOLORSTATIC:
- case WM_CTLCOLOREDIT:
- case WM_CTLCOLORLISTBOX:{
-  HDC dc=(HDC)wp;SetTextColor(dc,dashboard::fg);
-  SetBkColor(dc,dashboard::panel);
-  SetBkMode(dc,TRANSPARENT);
-  return (LRESULT)dashboard::brushFor(msg);
- }
- case WM_COMMAND:switch(LOWORD(wp)){
-  case dashboard::ID_DASH: case dashboard::ID_CELLS: case dashboard::ID_CONTROL: case dashboard::ID_SETTINGS: case dashboard::ID_LOG:{
-   dashboard::page=static_cast<dashboard::Page>(LOWORD(wp)-dashboard::ID_DASH);
-   RECT rect{};GetClientRect(h,&rect);dashboard::layout(rect.right,rect.bottom,devicesList,valuesBox,logBox,protocolBox);break;
-  }
-  case SCAN:SendMessageW(devicesList,LB_RESETCONTENT,0,0);{std::lock_guard lock(devicesMutex);discovered.clear();}scan();break;
-  case CONNECT:{
-   int idx=(int)SendMessageW(devicesList,LB_GETCURSEL,0,0);if(idx==LB_ERR){log(L"Select device");break;}
-   wchar_t name[512]{};SendMessageW(devicesList,LB_GETTEXT,idx,(LPARAM)name);uint64_t address{};
-   {std::lock_guard lock(devicesMutex);auto it=discovered.find(name);if(it!=discovered.end())address=it->second;}
-   if(address){stopScan();std::thread([address]{connect(address);}).detach();}break;
-  }
-  case DISCONNECT:disconnect();break;
-  case SAVE:save();break;
- }return 0;
- case WM_APP+4:{std::unique_ptr<std::wstring> state(reinterpret_cast<std::wstring*>(lp));dashboard::connected=(*state==L"connected");InvalidateRect(h,nullptr,FALSE);return 0;}
- case WM_FOUND:{std::unique_ptr<std::wstring> name(reinterpret_cast<std::wstring*>(lp));if(SendMessageW(devicesList,LB_FINDSTRINGEXACT,(WPARAM)-1,(LPARAM)name->c_str())==LB_ERR)SendMessageW(devicesList,LB_ADDSTRING,0,(LPARAM)name->c_str());return 0;}
- case WM_LOG:{std::unique_ptr<std::wstring> line(reinterpret_cast<std::wstring*>(lp));int end=GetWindowTextLengthW(logBox);SendMessageW(logBox,EM_SETSEL,end,end);auto entry=*line+L"\r\n";SendMessageW(logBox,EM_REPLACESEL,FALSE,(LPARAM)entry.c_str());return 0;}
- case WM_VALUES:{std::unique_ptr<std::wstring> value(reinterpret_cast<std::wstring*>(lp));SetWindowTextW(valuesBox,value->c_str());dashboard::update(*value);return 0;}
- case WM_DESTROY:KillTimer(h,7001);disconnect();dashboard::shutdown();windowHandle=nullptr;PostQuitMessage(0);return 0;
- }return DefWindowProcW(h,msg,wp,lp);
+ case WM_DESTROY:
+  running=false;queueReady.notify_all();
+  // Worker shutdown is deferred to process teardown if an OS Bluetooth call is blocked.
+  if(bleThread.joinable())bleThread.detach();
+  browser.Reset();controller.Reset();hwnd=nullptr;PostQuitMessage(0);return 0;
+ }return DefWindowProcW(w,msg,wp,lp);
 }
 int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,LPWSTR,int show){
- try{
-  init_apartment(apartment_type::multi_threaded);INITCOMMONCONTROLSEX controls{sizeof(controls),ICC_STANDARD_CLASSES};InitCommonControlsEx(&controls);
-  WNDCLASSEXW cls{sizeof(cls)};cls.lpfnWndProc=procedure;cls.hInstance=instance;cls.lpszClassName=L"JK_BMS_PC";cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.hbrBackground=(HBRUSH)(COLOR_WINDOW+1);RegisterClassExW(&cls);
-  HWND hwnd=CreateWindowExW(0,cls.lpszClassName,L"JK BMS Studio | Native BLE Dashboard",WS_OVERLAPPEDWINDOW|WS_VISIBLE,CW_USEDEFAULT,CW_USEDEFAULT,1280,860,nullptr,nullptr,instance,nullptr);
-  ShowWindow(hwnd,show);MSG message{};while(GetMessageW(&message,nullptr,0,0)>0){TranslateMessage(&message);DispatchMessageW(&message);}return (int)message.wParam;
- }catch(...){MessageBoxW(nullptr,L"Windows Bluetooth initialization failed",L"JK BMS",MB_ICONERROR);return 1;}
+ CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
+ WNDCLASSW cls{};cls.lpfnWndProc=wndProc;cls.hInstance=instance;cls.lpszClassName=L"JKBMS_WebView_Host";cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);RegisterClassW(&cls);
+ bleThread=std::thread(bleWorker);
+ HWND w=CreateWindowExW(0,cls.lpszClassName,L"JK BMS Studio",WS_OVERLAPPEDWINDOW|WS_VISIBLE,CW_USEDEFAULT,CW_USEDEFAULT,1380,900,nullptr,nullptr,instance,nullptr);
+ ShowWindow(w,show);
+ MSG msg{};while(GetMessageW(&msg,nullptr,0,0)>0){TranslateMessage(&msg);DispatchMessageW(&msg);}
+ CoUninitialize();return (int)msg.wParam;
 }
