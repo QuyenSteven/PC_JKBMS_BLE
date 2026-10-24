@@ -1,37 +1,39 @@
-# JK BMS Studio — Windows C++ BLE + WebView2
+# JK BMS Studio — Windows BLE (C++20 + WebView2)
 
-Ứng dụng giám sát JK BMS bằng Bluetooth LE của PC, giao diện web nhúng trong EXE, không cần Python.
+Ứng dụng kết nối JK BMS bằng BLE của PC, đọc trực tiếp các thông số pin và cấu hình. Mã nguồn native C++ và giao diện HTML/CSS/JavaScript.
 
-## Kiến trúc
+## Cài đặt / Build
 
-- `src/main.cpp`: Windows WebView2 host, BLE worker, GATT FFE0/FFE1, kết nối và gửi dữ liệu sang WebUI.
-- `src/jk_protocol.h`: bộ ghép khung JK, kiểm tra CRC, giải mã tự động JK02_24S / JK02_32S; JK04 chỉ giải mã điện áp cell.
-- `web/index.html`: Overview, Cell pin (thẻ cell + biểu đồ), Control trạng thái MOSFET, Protection đọc trạng thái khung Settings, BLE Diagnostics.
-- `tests/jk_protocol_tests.cpp`: test khung BLE/decoder.
-- `tests/webui_smoke.cjs`: test JavaScript và cập nhật DOM cell, Control/Protection, trạng thái kết nối.
-- `.github/workflows/windows-build.yml`: build và kiểm thử trên Windows; xuất EXE kèm WebUI.
+1. Mở `JK_BMS_PC.sln` trong Visual Studio 2026, chọn **Release | x64**.
+2. Restore NuGet Packages để lấy native SDK `Microsoft.Web.WebView2`.
+3. Chọn **Build → Rebuild Solution**.
+4. Mở EXE, quét BLE, chọn JK BMS, kết nối và để giao thức AUTO.
+5. Nếu chạy EXE thủ công, giữ `web/index.html` và `web/settings.js` trong thư mục `web` cạnh EXE (project sẽ copy tự động sau Build).
 
-## Build trên Visual Studio 2026
+## Tính năng
 
-1. Cập nhật mã nguồn từ `main`.
-2. Mở `JK_BMS_PC.sln`, chọn `Release | x64`.
-3. Restore NuGet Packages (WebView2), rồi Rebuild Solution.
-4. Mở EXE, **Quét BLE → chọn JK BMS → Kết nối**, để protocol **Tự nhận dạng (AUTO)**.
+- **Tổng quan:** điện áp/công suất/dòng/SOC, cell, trạng thái MOSFET.
+- **Cell pin:** thẻ từng cell, min/max/trung bình, chênh lệch mV và biểu đồ.
+- **Bảo vệ:** giải mã Settings frame `0x01` theo bảng JK02_24S/JK02_32S hoặc những offset JK04 được xác minh; điện áp cell OVP/UVP và hồi phục, quá dòng sạc/xả và độ trễ, quá nhiệt/thấp nhiệt, cân bằng, MOS và dung lượng.
+- **Chỉnh sửa:** nhập thông số, hiển thị điểm thay đổi, kiểm tra giới hạn, xác nhận `GHI`, gửi từng thanh ghi một, tự đọc lại frame `0x01` ít nhất **2 lần**; chỉ báo hoàn tất khi giá trị đọc lại trùng.
+- **Control:** charge/discharge MOSFET, active balance. Đổi trạng thái chỉ khi đã nhận dạng đúng protocol và có cấu hình mới, cần xác nhận `GHI`.
+- **Reboot:** lệnh `0x66` từ nguồn giao thức tham chiếu, yêu cầu xác nhận `REBOOT`. Không thể cam kết khởi động lại thành công chỉ từ phản hồi gửi BLE.
+- **Sao lưu:** xuất JSON chứa giá trị *đọc từ BMS* kèm model, firmware, serial và MAC BLE.
+- **Khôi phục:** tải JSON, chỉ cho cùng model/firmware/serial/MAC, xem trước thay đổi, ghi từng tham số kèm đọc lại. **Không tự động ghi khi chọn file.**
+- **Diagnostics:** log GATT, khung 0x01/0x02/0x03, xuất RAW.
 
-## Trang giao diện
+## An toàn khi cấu hình
 
-- **Tổng quan:** điện áp/dòng/công suất/SOC, cell, MOSFET (dữ liệu BLE thực tế).
-- **Cell pin:** danh sách từng cell, min/max/avg, độ lệch mV so với trung bình, biểu đồ so sánh.
-- **Điều khiển:** hiển thị trạng thái Charge/Discharge/Balance. Các lệnh ghi/reboot vẫn khóa vì chưa kiểm tra an toàn theo model.
-- **Bảo vệ:** khung `0x01` khi được nhận được ghi nhận là *Settings RAW*. Những thông số chưa xác minh offset hiển thị `--`, không đoán giá trị.
-- **BLE / Nhật ký:** bộ đếm khung 0x01/0x02/0x03, thời điểm cuối, sao chép/xóa log, xuất dữ liệu RAW.
+Ghi tham số bảo vệ có thể khiến BMS ngắt tải, sạc hoặc bảo vệ không đúng. Chỉ sử dụng sau khi kiểm tra đúng model/firmware và giá trị an toàn với loại cell, hệ pin. Không thay nhiều ngưỡng quan trọng cùng lúc khi chưa biết ý nghĩa. 
+- C++ kiểm tra cấu hình còn mới (trong 30 giây), dữ liệu từ frame CRC hợp lệ, model và giao thức đã nhận dạng từ telemetry, phạm vi giá trị và quan hệ ngưỡng bảo vệ; chỉ có một lệnh ghi đang xử lý.
+- Thành công gửi GATT **không có nghĩa** BMS đã lưu. Chương trình phải đọc lại `0x01` hai lần trùng giá trị.
+- Những thanh ghi JK04 chưa có bản đồ xác nhận bị khóa; các tham số hỗ trợ sẽ có thể chỉnh sửa.
+- Gói backup không thay thế việc đối chiếu các ngưỡng thực tế trước khi restore.
+- Chưa có kiểm thử ghi BMS thật trong CI; chỉ bộ giải mã, encoder và state machine phía UI được kiểm thử tự động. Việc kiểm tra ghi sau này phải có thiết bị và tải an toàn.
 
-## Giao thức
+## Nguồn tham chiếu kỹ thuật
 
-Thiết bị sử dụng FFE0/FFE1. Sau khi bật notification, chương trình hỏi `0x97` (thông tin thiết bị); khung `0x03` nhận được kích hoạt yêu cầu trạng thái `0x96`. Nếu không có telemetry `0x02`, chương trình thử lại `0x96` với chu kỳ; khi đã có dữ liệu tự phát thì chỉ thử lại nếu stream gián đoạn.
-
-Bộ giải mã JK02 được kiểm tra bằng mẫu tổng hợp và đã hiển thị số thực từ BMS trong quá trình thử nghiệm trên máy người dùng. **Chưa xác minh đầy đủ mọi dòng model/firmware JK**; JK04 chưa có dữ liệu pack đã xác nhận.
-
-### Giới hạn an toàn
-
-Các lệnh thay đổi ngưỡng bảo vệ, charge/discharge MOSFET, cân bằng, khôi phục cấu hình và reboot BMS **chưa được thực hiện**. Cần xác định đúng model/firmware và khung lệnh ghi, ACK và đọc lại trước khi mở tính năng. EXE/CI build thành công không thay thế thử nghiệm với BMS thật.
+- [syssi/esphome-jk-bms BLE protocol](https://github.com/syssi/esphome-jk-bms/blob/main/docs/protocol-design-ble.md)
+- [syssi/esphome-jk-bms decoder & settings register map](https://github.com/syssi/esphome-jk-bms/tree/main/components/jk_bms_ble)
+- `src/jk_protocol.h` và `src/jk_settings.h` chứa bảng mã hóa/giải mã.
+- `tests/jk_protocol_tests.cpp`, `tests/webui_smoke.cjs`, `tests/settings_ui_smoke.cjs` là kiểm thử hồi quy trong GitHub Actions.
