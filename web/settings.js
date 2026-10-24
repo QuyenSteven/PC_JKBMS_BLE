@@ -104,12 +104,13 @@ function render(){
 function settingsArrived(data){
  if(!Array.isArray(data.fields)||!data.protocol)return;
  const newModel=(data.model||'').trim(),newFirmware=(data.firmware||'').trim();
- const fingerprint=newModel+'|'+newFirmware+'|'+data.protocol;
+ const newSerial=(data.serial||'').trim(),newMac=(data.mac||'').trim();
+ const fingerprint=newModel+'|'+newFirmware+'|'+data.protocol+'|'+newSerial+'|'+newMac;
  if(meta && meta.fingerprint!==fingerprint){
   edits.clear();queue=[];pending=null;importSource=null;
   toast('Đã chuyển model hoặc phiên bản phần mềm; mọi chỉnh sửa chưa ghi đã hủy.');
  }
- meta={model:newModel,firmware:newFirmware,protocol:data.protocol,fingerprint};
+ meta={model:newModel,firmware:newFirmware,protocol:data.protocol,serial:newSerial,mac:newMac,fingerprint};
  ready=data.ready===true;
  current=new Map(data.fields.filter(x=>x&&typeof x.id==='string'&&Number.isFinite(x.value)).map(x=>[x.id,x]));
  for(const key of Array.from(edits.keys()))if(!current.has(key))edits.delete(key);
@@ -188,12 +189,12 @@ function exportBackup(){
  if(!current||!current.size||!meta)return;
  const values={};for(const [key,entry] of current)values[key]=Number(entry.value);
  const snapshot={format:'JK_BMS_STUDIO_CONFIG_V1',timestamp:new Date().toISOString(),model:meta.model,
-  firmware:meta.firmware,protocol:meta.protocol,values};
+  firmware:meta.firmware,protocol:meta.protocol,serial:meta.serial,mac:meta.mac,values};
  const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});
  const url=URL.createObjectURL(blob),link=document.createElement('a');
  const safe=(meta.model||'JK-BMS').replace(/[^a-z0-9_-]/gi,'_');
  link.href=url;link.download=safe+'_'+meta.protocol+'_settings.json';
- document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+ document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
  toast('Đã xuất cấu hình JSON đã đọc trực tiếp từ BMS.');
 }
 async function importBackup(file){
@@ -204,8 +205,8 @@ async function importBackup(file){
   toast('Đây không phải tệp sao lưu JK BMS Studio.');return;
  }
  if(!guardReady()){toast('Hãy kết nối và đọc Settings từ BMS trước khi khôi phục.');return;}
- if(data.model!==meta.model||data.firmware!==meta.firmware||data.protocol!==meta.protocol){
-  toast('Không trùng model / firmware / giao thức. Không khôi phục sang BMS khác.');return;
+ if(data.model!==meta.model||data.firmware!==meta.firmware||data.protocol!==meta.protocol||data.serial!==meta.serial||data.mac!==meta.mac){
+  toast('Không trùng model, firmware, serial hoặc địa chỉ BLE. Không khôi phục sang BMS khác.');return;
  }
  const changes=[];for(const [key,value] of Object.entries(data.values)){
   const f=current.get(key);
