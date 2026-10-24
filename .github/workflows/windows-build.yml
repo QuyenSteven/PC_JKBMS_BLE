@@ -11,13 +11,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: microsoft/setup-msbuild@v2
       - uses: NuGet/setup-nuget@v2
-      - name: Restore NuGet dependencies
+      - name: Restore NuGet PackageReference dependencies
         run: |
-          nuget restore JK_BMS_PC.sln -PackagesDirectory packages -NonInteractive
-          if ($LASTEXITCODE -ne 0) { throw "NuGet packages.config restore failed" }
-          if (-not (Test-Path "packages/Microsoft.Web.WebView2.1.0.2903.40/build/native/include/WebView2.h")) { throw "WebView2.h missing after restore" }
-          msbuild JK_BMS_PC.vcxproj -t:Restore -p:Configuration=Release -p:Platform=x64
-          if ($LASTEXITCODE -ne 0) { throw "CppWinRT PackageReference restore failed" }
+          msbuild JK_BMS_PC.vcxproj /t:Restore /p:Configuration=Release /p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { throw "NuGet PackageReference restore failed" }
+          $sdk="packages/microsoft.web.webview2/1.0.2903.40/build/native"
+          if (-not (Test-Path "$sdk/include/WebView2.h")) { throw "WebView2.h missing after restore" }
+          if (-not (Test-Path "$sdk/x64/WebView2LoaderStatic.lib")) { throw "WebView2LoaderStatic.lib missing after restore" }
       - name: Build Windows x64 Release
         run: |
           msbuild JK_BMS_PC.vcxproj /m /p:Configuration=Release /p:Platform=x64
