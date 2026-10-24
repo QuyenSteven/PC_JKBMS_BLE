@@ -132,7 +132,9 @@ void emitSettings(){
  std::wostringstream stream;
  stream<<L"{\"type\":\"settings\",\"protocol\":\""<<jk::name(p)
        <<L"\",\"model\":\""<<jsonEscape(model)
-       <<L"\",\"firmware\":\""<<jsonEscape(software)<<L"\",\"fields\":[";
+       <<L"\",\"firmware\":\""<<jsonEscape(software)
+       <<L"\",\"ready\":"<<((observedProtocol.load()==p && !model.empty())?L"true":L"false")
+       <<L",\"fields\":[";
  bool first=true;
  for(auto const& descriptor:jk::settings()){
   auto value=jk::readSetting(frame,descriptor,p);
