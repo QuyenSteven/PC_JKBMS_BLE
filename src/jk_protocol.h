@@ -60,31 +60,31 @@ inline std::optional<Telemetry> decodeJk02(std::vector<uint8_t> const& f,Protoco
  t.power=t.voltage*t.current;
  t.soc=f[141+off];t.charge=f[166+off];t.discharge=f[167+off];
  t.balance=f[140+off]!=0?1:0;
- auto temperature=[&](size_t location)->std::optional<double>{
+ // JK02 temperature offsets verified against syssi/esphome-jk-bms.
+ // The "sensor absent" mask is not consistently populated by JK variants.
+ // Trust a physically plausible sensor reading even if the mask claims absent;
+ // treat zero as unavailable only when the corresponding absent bit is set.
+ const uint16_t absent=u16(f,182+off);
+ auto temperature=[&](size_t location,unsigned absentBit)->std::optional<double>{
   if(location+1>=f.size())return {};
-  double value=static_cast<int16_t>(u16(f,location))*0.1;
+  const uint16_t raw=u16(f,location);
+  if(raw==0xFFFFu||raw==0x7FFFu)return {};
+  if(raw==0 && (absent & (uint16_t(1)<<absentBit)))return {};
+  const double value=static_cast<int16_t>(raw)*0.1;
   if(!std::isfinite(value)||value < -55.0||value > 145.0)return {};
   return value;
  };
- // JK02 24S and 32S share T1 and T2 at 130/132 + cell-layout offset.
- // MOS sensor differs: 24S at 134; 32S at 112 + 2*offset (=176).
- t.temperature1=temperature(130+off);
- t.temperature2=temperature(132+off);
- t.mosTemperature=temperature(p==Protocol::JK02_32S?112+2*off:134);
+ // JK02_24S: T1=130, T2=132, MOS=134.
+ // JK02_32S: T1=162, T2=164, MOS=176,
+ //           T3=258, T4=256, T5=254 (all int16 LE, 0.1 °C).
+ t.temperature1=temperature(130+off,1);
+ t.temperature2=temperature(132+off,2);
+ t.mosTemperature=temperature(p==Protocol::JK02_32S?176:134,0);
  if(p==Protocol::JK02_32S){
-  // Additional probes only exist on selected JK02_32S boards.
-  if(u16(f,226+off)!=0)t.temperature3=temperature(226+off);
-  if(u16(f,224+off)!=0)t.temperature4=temperature(224+off);
-  if(u16(f,222+off)!=0)t.temperature5=temperature(222+off);
+  t.temperature3=temperature(226+off,3);
+  t.temperature4=temperature(224+off,4);
+  t.temperature5=temperature(222+off,5);
  }
- // Temperature sensor absent flags (bit0 MOS, bits1..5 T1..T5).
- uint16_t absent=u16(f,182+off);
- if(absent&(1u<<0))t.mosTemperature.reset();
- if(absent&(1u<<1))t.temperature1.reset();
- if(absent&(1u<<2))t.temperature2.reset();
- if(absent&(1u<<3))t.temperature3.reset();
- if(absent&(1u<<4))t.temperature4.reset();
- if(absent&(1u<<5))t.temperature5.reset();
  t.alarms=p==Protocol::JK02_32S?u32(f,134+off):u16(f,136+off);
  if(t.voltage<5.0||t.voltage>200.0||std::abs(t.current)>3000||t.soc>100)return {};
  if(std::abs(t.voltage-sum)>std::max(1.2,sum*0.08))return {};
