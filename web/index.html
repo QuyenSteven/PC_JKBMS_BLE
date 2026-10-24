@@ -2,7 +2,77 @@
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>JK BMS Studio</title>
 <style>
-:root{font-family:"Segoe UI",Inter,system-ui,sans-serif;color:#e7edf5;background:#0a101b;--card:#131e2d;--line:#263647;--muted:#90a4ba;--primary:#1fcaa9;--orange:#ffa764}*{box-sizing:border-box}body{margin:0}button,select{font:inherit}button{cursor:pointer} .shell{display:grid;grid-template-columns:235px 1fr;min-height:100vh} aside{background:#111a29;border-right:1px solid var(--line);padding:23px 14px;display:flex;flex-direction:column;gap:26px}.brand{display:flex;align-items:center;gap:12px;padding:8px 12px}.symbol{display:grid;place-items:center;width:43px;height:43px;border-radius:14px;background:linear-gradient(145deg,#38e1b7,#147c96);font-weight:900;color:#06202a}.brand strong{display:block;font-size:19px;letter-spacing:.5px}.brand small{color:var(--muted);font-size:11px;letter-spacing:1.7px}.nav{display:grid;gap:7px}.nav button{background:transparent;border:0;border-radius:11px;padding:14px;text-align:left;color:#9fb1c5;display:flex;align-items:center;gap:13px}.nav button.active,.nav button:hover{background:#203b42;color:#5ae6ca}.nav svg{width:19px;height:19px}.side-bottom{margin-top:auto;border-top:1px solid var(--line);padding:18px 11px;font-size:12px;color:var(--muted);line-height:2}.pulse{color:var(--orange)}main{padding:28px 32px;max-width:1640px;width:100%;margin:0 auto}header{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:28px}h1{font-size:26px;letter-spacing:-.7px;margin:0} .sub{margin:7px 0 0;color:var(--muted);font-size:13px}.status{display:flex;align-items:center;gap:9px;background:#1d2838;border:1px solid #314256;border-radius:99px;padding:9px 16px;font-size:12px;color:#d5dfeb}.status b{width:8px;height:8px;border-radius:50%;background:#8494a5}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}button.action,select{border:1px solid #344457;background:#1a293c;color:#eaf1f7;padding:11px 18px;border-radius:10px}.action.primary{background:linear-gradient(130deg,#1bb69d,#168e96);border:0;color:#03191b;font-weight:700}.action:disabled{opacity:.45;cursor:not-allowed}select{margin-left:auto;min-width:155px}.panel{background:linear-gradient(145deg,#172436,#121d2c);border:1px solid #263749;border-radius:17px;padding:20px}.device{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}.micro{font-size:11px;color:#91aac4;letter-spacing:1.4px;font-weight:700}.device h2{margin:9px 0 0;font-size:18px}.device small{color:var(--muted)}.tag{padding:7px 11px;border-radius:20px;background:#283342;font-size:12px;color:#aebdd0}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.metric{min-height:170px;padding:21px;position:relative;overflow:hidden}.metric .label{font-size:11px;letter-spacing:1.2px;color:#9eb1c4;font-weight:700}.metric .value{font-weight:750;font-size:36px;letter-spacing:-1px;margin-top:22px}.metric .unit{font-size:16px;color:#9fb5c8}.metric .hint{font-size:12px;color:#8b9fb3;margin-top:9px}.metric:after{content:"";position:absolute;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,#1aa89120,transparent 70%);right:-42px;bottom:-46px}.split{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(295px,1fr);gap:16px;margin-top:18px}.row-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.row-title h3{font-size:16px;margin:0}.row-title span{font-size:12px;color:var(--muted)}.cellgrid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}.cell{background:#1e3040;border:1px solid #2e4c57;border-radius:9px;text-align:center;padding:13px 3px}.cell .n{font-size:11px;color:#91aabc}.cell .v{margin-top:9px;font-size:15px;color:#7de3ce;font-weight:700}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.smallstat{background:#101b29;border-radius:10px;padding:13px}.smallstat small{color:#95a9bd}.smallstat strong{display:block;font-size:20px;margin-top:7px}.switchrow{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #2a3949}.switchrow:last-child{border:0}.switchrow small{display:block;margin-top:5px;color:#90a3b7}.pill{border-radius:99px;background:#283647;padding:7px 12px;color:#a2b3c5;font-size:11px}.footnote{margin-top:18px;padding:14px 18px;background:#2e281c;border:1px solid #6b502c;color:#e6c28c;border-radius:11px;font-size:12px}.view{display:none}.view.active{display:block}.empty{padding:50px 20px;text-align:center;color:#9eb0c4}.empty h3{color:#f0f5fa}.warning{color:#ffbf79}.log{width:100%;height:350px;resize:vertical;background:#0d1622;border:1px solid var(--line);border-radius:10px;color:#a9baca;padding:15px;font:13px Consolas,monospace}.spark{height:65px;display:flex;align-items:end;gap:6px;margin-top:18px}.spark i{display:block;flex:1;background:linear-gradient(#27d5b5,#177e83);min-height:5px;border-radius:4px 4px 0 0;opacity:.35} @media(max-width:1100px){.cellgrid{grid-template-columns:repeat(4,1fr)}.metrics{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}}@media(max-width:700px){.shell{grid-template-columns:1fr}aside{padding:10px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.side-bottom{display:none}main{padding:18px}.metrics{gap:9px}.metric{min-height:145px}.metric .value{font-size:28px}.device{flex-wrap:wrap}select{margin-left:0}}
+:root{font-family:"Segoe UI",Inter,system-ui,sans-serif;color:#e7edf5;background:#0a101b;--card:#131e2d;--line:#263647;--muted:#90a4ba;--primary:#1fcaa9;--orange:#ffa764}*{box-sizing:border-box}body{margin:0}button,select{font:inherit}button{cursor:pointer} .shell{display:grid;grid-template-columns:235px 1fr;min-height:100vh} aside{background:#111a29;border-right:1px solid var(--line);padding:23px 14px;display:flex;flex-direction:column;gap:26px}.brand{display:flex;align-items:center;gap:12px;padding:8px 12px}.symbol{display:grid;place-items:center;width:43px;height:43px;border-radius:14px;background:linear-gradient(145deg,#38e1b7,#147c96);font-weight:900;color:#06202a}.brand strong{display:block;font-size:19px;letter-spacing:.5px}.brand small{color:var(--muted);font-size:11px;letter-spacing:1.7px}.nav{display:grid;gap:7px}.nav button{background:transparent;border:0;border-radius:11px;padding:14px;text-align:left;color:#9fb1c5;display:flex;align-items:center;gap:13px}.nav button.active,.nav button:hover{background:#203b42;color:#5ae6ca}.nav svg{width:19px;height:19px}.side-bottom{margin-top:auto;border-top:1px solid var(--line);padding:18px 11px;font-size:12px;color:var(--muted);line-height:2}.pulse{color:var(--orange)}main{padding:28px 32px;max-width:1640px;width:100%;margin:0 auto}header{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:28px}h1{font-size:26px;letter-spacing:-.7px;margin:0} .sub{margin:7px 0 0;color:var(--muted);font-size:13px}.status{display:flex;align-items:center;gap:9px;background:#1d2838;border:1px solid #314256;border-radius:99px;padding:9px 16px;font-size:12px;color:#d5dfeb}.status b{width:8px;height:8px;border-radius:50%;background:#8494a5}.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}button.action,select{border:1px solid #344457;background:#1a293c;color:#eaf1f7;padding:11px 18px;border-radius:10px}.action.primary{background:linear-gradient(130deg,#1bb69d,#168e96);border:0;color:#03191b;font-weight:700}.action:disabled{opacity:.45;cursor:not-allowed}select{margin-left:auto;min-width:155px}.panel{background:linear-gradient(145deg,#172436,#121d2c);border:1px solid #263749;border-radius:17px;padding:20px}.device{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}.micro{font-size:11px;color:#91aac4;letter-spacing:1.4px;font-weight:700}.device h2{margin:9px 0 0;font-size:18px}.device small{color:var(--muted)}.tag{padding:7px 11px;border-radius:20px;background:#283342;font-size:12px;color:#aebdd0}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.metric{min-height:170px;padding:21px;position:relative;overflow:hidden}.metric .label{font-size:11px;letter-spacing:1.2px;color:#9eb1c4;font-weight:700}.metric .value{font-weight:750;font-size:36px;letter-spacing:-1px;margin-top:22px}.metric .unit{font-size:16px;color:#9fb5c8}.metric .hint{font-size:12px;color:#8b9fb3;margin-top:9px}.metric:after{content:"";position:absolute;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,#1aa89120,transparent 70%);right:-42px;bottom:-46px}.split{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(295px,1fr);gap:16px;margin-top:18px}.row-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.row-title h3{font-size:16px;margin:0}.row-title span{font-size:12px;color:var(--muted)}.cellgrid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px}.cell{background:#1e3040;border:1px solid #2e4c57;border-radius:9px;text-align:center;padding:13px 3px}.cell .n{font-size:11px;color:#91aabc}.cell .v{margin-top:9px;font-size:15px;color:#7de3ce;font-weight:700}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.smallstat{background:#101b29;border-radius:10px;padding:13px}.smallstat small{color:#95a9bd}.smallstat strong{display:block;font-size:20px;margin-top:7px}.switchrow{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #2a3949}.switchrow:last-child{border:0}.switchrow small{display:block;margin-top:5px;color:#90a3b7}.pill{border-radius:99px;background:#283647;padding:7px 12px;color:#a2b3c5;font-size:11px}.view{display:none}.view.active{display:block}.empty{padding:50px 20px;text-align:center;color:#9eb0c4}.empty h3{color:#f0f5fa}.warning{color:#ffbf79}.log{width:100%;height:350px;resize:vertical;background:#0d1622;border:1px solid var(--line);border-radius:10px;color:#a9baca;padding:15px;font:13px Consolas,monospace}.spark{height:65px;display:flex;align-items:end;gap:6px;margin-top:18px}.spark i{display:block;flex:1;background:linear-gradient(#27d5b5,#177e83);min-height:5px;border-radius:4px 4px 0 0;opacity:.35} @media(max-width:1100px){.cellgrid{grid-template-columns:repeat(4,1fr)}.metrics{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}}@media(max-width:700px){.shell{grid-template-columns:1fr}aside{padding:10px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap}.side-bottom{display:none}main{padding:18px}.metrics{gap:9px}.metric{min-height:145px}.metric .value{font-size:28px}.device{flex-wrap:wrap}select{margin-left:0}}
+
+/* JK BMS Studio / unified dashboard visual system */
+.panel{box-shadow:0 8px 26px rgba(0,0,0,.10)}
+.section-subtitle{font-size:12px;font-weight:400;color:var(--muted);margin:8px 0 0;line-height:1.5}
+.soft-chip{display:inline-flex;align-items:center;border:1px solid #324558;border-radius:999px;background:#1c2b3d;color:#afc5d8;padding:8px 12px;font-size:12px;white-space:nowrap}
+.sidebar-connection{display:flex;align-items:center;gap:9px;margin-top:11px;color:#b8cada}
+.sidebar-connection i{display:inline-block;height:8px;width:8px;border-radius:50%;background:#71879a}
+.sidebar-connection.online i{background:#28d0a9;box-shadow:0 0 0 4px #1a514840}
+.sidebar-version{font-size:11px;color:#748da7;margin-top:12px}
+.cell-dashboard,.cell-chart-panel{margin-bottom:16px}
+.cell-kpis,.protection-overview,.diagnostic-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin:18px 0 22px}
+.mini-kpi{padding:16px 17px;min-width:0;background:#101b2b;border:1px solid #273a4d;border-radius:13px}
+.mini-kpi span{display:block;font-size:10px;letter-spacing:1.05px;font-weight:700;color:#8ba8bf}
+.mini-kpi strong{display:block;margin-top:12px;min-height:31px;font-size:24px;letter-spacing:-.5px;color:#f2f7fd;white-space:nowrap}
+.mini-kpi small{display:block;margin-top:7px;font-size:11px;color:#85a0b8}
+.small-heading{border-top:1px solid #2a3b4c;padding-top:22px}
+.cell-grid-page{display:grid;grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:12px;margin:19px 0 6px}
+.cell-card{background:linear-gradient(160deg,#203449,#142337);border:1px solid #2d475e;border-radius:14px;min-height:132px;padding:15px;display:flex;flex-direction:column;gap:12px;position:relative}
+.cell-card:before{content:"";position:absolute;left:15px;top:15px;width:5px;height:16px;border-radius:3px;background:#4eaaae}
+.cell-card .cell-index{padding-left:14px;font-size:11px;letter-spacing:1px;font-weight:700;color:#96bad0}
+.cell-card .cell-value{font-size:27px;font-weight:750;letter-spacing:-.6px;color:#f4fbff}
+.cell-card .cell-value small{font-size:13px;color:#9ab3c7}
+.cell-card .cell-offset{font-size:11px;color:#a1b6cc}
+.cell-card.is-low{border-color:#b57666;background:linear-gradient(160deg,#41303a,#192534)}
+.cell-card.is-low:before{background:#efac8b}
+.cell-card.is-high{border-color:#359f92;background:linear-gradient(160deg,#174a4e,#142b3a)}
+.cell-card.is-high:before{background:#46efc7}
+.cell-bars{display:flex;gap:11px;align-items:flex-end;overflow-x:auto;min-height:250px;padding:32px 3px 10px}
+.cell-bar-item{display:flex;flex:1 0 45px;max-width:115px;min-width:52px;align-items:center;flex-direction:column;gap:9px}
+.cell-bar-item .bar-plot{width:100%;height:185px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px solid #34475c;position:relative}
+.cell-bar-item .bar-stick{width:min(58%,42px);border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,#45d9c0,#1b777d);min-height:14px;transition:height .22s ease}
+.cell-bar-item.is-low .bar-stick{background:linear-gradient(180deg,#f6ab88,#ad5e54)}
+.cell-bar-item.is-high .bar-stick{background:linear-gradient(180deg,#66f0c4,#219a89)}
+.cell-bar-item .bar-voltage{font-size:12px;color:#d8e8f4;font-weight:700}
+.cell-bar-item .bar-label{font-size:11px;color:#93aabd}
+.chart-guide{display:flex;align-items:center;justify-content:space-between;gap:15px;color:#8fa9bf;font-size:12px;margin-top:8px}
+.legend{display:flex;gap:10px;align-items:center}.legend-point{height:9px;width:9px;border-radius:50%;display:inline-block}
+.legend-low{background:#f6ab88}.legend-high{background:#66f0c4}
+.subtle-note{color:#89a4ba;font-size:12px;line-height:1.6;margin:18px 0 0}
+.empty-state{grid-column:1/-1;padding:65px 22px;text-align:center;color:#8fa7bd;border:1px dashed #304359;border-radius:14px}
+.control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:24px 0 4px}
+.control-card{display:flex;align-items:center;gap:16px;background:#111e30;border:1px solid #2a3b50;border-radius:15px;min-height:116px;padding:18px}
+.control-icon{display:flex;align-items:center;justify-content:center;flex:0 0 50px;height:50px;border-radius:14px;background:#1f4b48;color:#5ee4ca;font-size:27px}
+.discharge-icon{background:#2b3b57;color:#82b6ff}.balance-icon{background:#3b3756;color:#c3b2ff}.reboot-icon{background:#333b49;color:#a4b8cc}
+.control-info{flex:1;min-width:0}.control-info h4{font-size:17px;margin:0 0 8px}.control-info p{color:#8da6bc;font-size:12px;margin:0}
+.state-pill{display:inline-flex;justify-content:center;min-width:77px;padding:9px 12px;border:1px solid #34485f;border-radius:99px;font-weight:700;font-size:12px;background:#223449}
+.state-pill.on{border-color:#28796d;color:#6aebc6;background:#173f3b}
+.state-pill.off{border-color:#865750;color:#ffb49f;background:#463039}
+.state-pill.neutral{color:#a6bdd0;background:#243448}
+.disabled-action{opacity:.5;cursor:not-allowed;white-space:nowrap}
+.info-panel{margin-top:16px}
+.info-list{display:grid;gap:0;margin-top:5px}
+.info-list div{display:flex;justify-content:space-between;gap:30px;padding:17px 0;border-bottom:1px solid #29394b;font-size:13px}
+.info-list div:last-child{border:0}.info-list span{color:#93aec4}.info-list strong{text-align:right;color:#d6e6f5;font-weight:600}
+.protection-overview{grid-template-columns:repeat(3,minmax(0,1fr))}
+.protection-table-wrap{overflow-x:auto;margin-top:14px}
+.protection-table{width:100%;border-collapse:collapse;min-width:650px;font-size:13px}
+.protection-table th{text-align:left;font-size:11px;color:#8eacc5;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:16px 12px;background:#142438}
+.protection-table td{padding:17px 12px;border-bottom:1px solid #26384c;color:#d8e6f5}
+.protection-table td:nth-child(3){font-variant-numeric:tabular-nums;font-weight:700}
+.protection-table td:last-child{color:#90a6bb;font-size:12px}
+.protection-table tbody tr:hover{background:#1c2c40}
+.diagnostic-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px}
+.diagnostic-actions{display:flex;gap:8px}.secondary-action{font-size:12px!important;padding:9px 13px!important}
+.log{height:clamp(320px,53vh,680px);line-height:1.55}
+.status.online{border-color:#23695b;color:#63e6c4}.status.online b{background:#2ed3a8}
+.tag.online{background:#194c44;color:#72efd1}
+@media(max-width:1260px){.cell-kpis{grid-template-columns:repeat(3,1fr)}.control-grid{grid-template-columns:1fr}}
+@media(max-width:950px){.cell-kpis{grid-template-columns:repeat(2,1fr)}.diagnostic-grid{grid-template-columns:repeat(2,1fr)}.protection-overview{grid-template-columns:1fr}.cell-grid-page{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
+@media(max-width:700px){.cell-kpis,.diagnostic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cell-grid-page{grid-template-columns:repeat(2,minmax(0,1fr))}.control-card{flex-wrap:wrap}.info-list div{flex-direction:column;gap:5px}.chart-guide{flex-wrap:wrap}}
 </style></head>
 <body><div class="shell">
 <aside><div class="brand"><div class="symbol">JK</div><div><strong>JK BMS</strong><small>DESKTOP STUDIO</small></div></div>
@@ -12,19 +82,87 @@
 <button data-page="control">⚡ &nbsp; Điều khiển</button>
 <button data-page="protection">⬡ &nbsp; Bảo vệ</button>
 <button data-page="diagnostics">≡ &nbsp; BLE / Nhật ký</button>
-</nav><div class="side-bottom">PHIÊN BẢN THIẾT KẾ<br>Web UI prototype 0.1<br><span class="pulse">●</span> Chưa kết nối BMS</div></aside>
+</nav><div class="side-bottom"><div class="micro">THIẾT BỊ BLUETOOTH</div><div class="sidebar-connection"><i id="side-dot"></i><span id="side-status">Chưa kết nối</span></div><div class="sidebar-version">JK BMS Studio · BLE</div></div></aside>
 <main><header><div><h1>Quản lý hệ thống pin</h1><p class="sub">Giám sát JK BMS thời gian thực qua Bluetooth Low Energy</p></div><span class="status" id="connection-status"><b></b> Chưa kết nối</span></header>
 <div class="actions"><button id="scan" class="action primary">⌁ &nbsp; Quét BLE</button><button id="connect" class="action">Kết nối</button><button id="disconnect" class="action">Ngắt kết nối</button><button id="save" class="action">Xuất dữ liệu</button><select id="protocol" aria-label="Loại giao thức"><option value="AUTO">Tự nhận dạng (AUTO)</option><option>JK02_32S</option><option>JK02_24S</option><option>JK04</option></select></div>
 <div class="panel device"><div><div class="micro">THIẾT BỊ ĐƯỢC CHỌN</div><h2 id="device-label">Chưa chọn JK BMS</h2><small id="device-detail">Bluetooth • Đang chờ kết nối</small></div><select id="device-list" aria-label="Thiết bị tìm được"><option value="">Chọn thiết bị BLE...</option></select><span class="tag" id="device-status">OFFLINE</span></div>
 <section id="overview" class="view active">
 <div class="metrics"><div class="panel metric"><div class="label">ĐIỆN ÁP PACK</div><div id="pack-voltage" class="value">--<span class="unit"> V</span></div><div class="hint">Điện áp tổng</div></div><div class="panel metric"><div class="label">DÒNG ĐIỆN</div><div id="pack-current" class="value">--<span class="unit"> A</span></div><div class="hint">Sạc / xả</div></div><div class="panel metric"><div class="label">CÔNG SUẤT</div><div id="pack-power" class="value">--<span class="unit"> W</span></div><div class="hint">Công suất tức thời</div></div><div class="panel metric"><div class="label">DUNG LƯỢNG SOC</div><div id="pack-soc" class="value">--<span class="unit"> %</span></div><div class="hint">Dung lượng còn lại</div></div></div>
-<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span>Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill">Chưa có dữ liệu</span></div></div></div>
+<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span id="overview-cell-status">Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
 </section>
-<section id="cells" class="view"><div class="panel"><div class="row-title"><h3>Phân tích điện áp cell</h3><span>Hiển thị khi có dữ liệu BLE</span></div><div class="empty">Chưa kết nối BMS. Biểu đồ sẽ hiển thị điện áp từng cell, min/max và độ lệch.</div></div></section>
-<section id="control" class="view"><div class="panel"><div class="row-title"><h3>Điều khiển BMS</h3><span class="warning">Đang khóa an toàn</span></div><div class="switchrow">Charge MOS <span class="pill">Chỉ đọc</span></div><div class="switchrow">Discharge MOS <span class="pill">Chỉ đọc</span></div><div class="switchrow">Cân bằng cell <span class="pill">Chỉ đọc</span></div><div class="switchrow">Reboot BMS <span class="pill">Chưa hỗ trợ</span></div></div></section>
-<section id="protection" class="view"><div class="panel"><div class="row-title"><h3>Cấu hình bảo vệ</h3><span>Chưa có dữ liệu đọc</span></div><div class="empty">Danh sách OVP, UVP, OCP, nhiệt độ và độ trễ sẽ được hiển thị sau khi tích hợp bộ giải mã cấu hình.</div></div></section>
-<section id="diagnostics" class="view"><div class="panel"><div class="row-title"><h3>Nhật ký BLE</h3><span>Chưa có dữ liệu</span></div><textarea class="log" id="ble-log" readonly placeholder="Kết nối thiết bị để nhận nhật ký BLE..."></textarea></div></section>
-<div class="footnote" id="safety">Giám sát BLE trực tiếp. Chế độ đọc an toàn: các lệnh ghi bảo vệ, điều khiển MOSFET và reboot chưa được mở khi chưa xác minh firmware.</div>
+<section id="cells" class="view">
+  <div class="panel cell-dashboard">
+    <div class="row-title"><div><h3>Phân tích điện áp từng cell</h3><p class="section-subtitle">Theo dõi chênh lệch điện áp và mức cân bằng trực tiếp từ BMS</p></div><span id="cells-title-status" class="soft-chip">Đang chờ dữ liệu</span></div>
+    <div class="cell-kpis">
+      <div class="mini-kpi"><span>SỐ CELL</span><strong id="cells-count">--</strong><small>Cell đang hoạt động</small></div>
+      <div class="mini-kpi"><span>THẤP NHẤT</span><strong id="cells-min">-- V</strong><small id="cells-min-index">Chưa có dữ liệu</small></div>
+      <div class="mini-kpi"><span>CAO NHẤT</span><strong id="cells-max">-- V</strong><small id="cells-max-index">Chưa có dữ liệu</small></div>
+      <div class="mini-kpi"><span>ĐỘ LỆCH</span><strong id="cells-delta">-- mV</strong><small>Max - Min</small></div>
+      <div class="mini-kpi"><span>TRUNG BÌNH</span><strong id="cells-avg">-- V</strong><small>Điện áp trung bình</small></div>
+    </div>
+    <div class="row-title small-heading"><h3>Chi tiết cell</h3><span id="cells-grid-status">Các cell đang được giám sát</span></div>
+    <div id="cell-grid-page" class="cell-grid-page"><div class="empty-state">Kết nối JK BMS để hiển thị từng cell.</div></div>
+  </div>
+  <div class="panel cell-chart-panel">
+    <div class="row-title"><div><h3>Biểu đồ độ lệch cell</h3><p class="section-subtitle">Chiều cao cột biểu thị mức chênh lệch tương đối giữa các cell</p></div><span id="cell-bar-caption" class="soft-chip">Chưa có dữ liệu</span></div>
+    <div class="chart-guide"><span>Điện áp cell (V)</span><div class="legend"><span class="legend-point legend-low"></span>Thấp nhất <span class="legend-point legend-high"></span>Cao nhất</div></div>
+    <div id="cell-bars" class="cell-bars"><div class="empty-state">Biểu đồ xuất hiện khi có dữ liệu BLE.</div></div>
+    <p id="cell-chart-note" class="subtle-note">Điện áp hiển thị theo từng cell hoạt động; không có dữ liệu mô phỏng.</p>
+  </div>
+</section>
+<section id="control" class="view">
+  <div class="panel">
+    <div class="row-title"><div><h3>Điều khiển và trạng thái BMS</h3><p class="section-subtitle">Trạng thái đọc trực tiếp từ thiết bị; lệnh ghi chỉ mở sau khi xác minh theo model và firmware</p></div><span id="control-status" class="soft-chip">Chế độ giám sát</span></div>
+    <div class="control-grid">
+      <div class="control-card"><div class="control-icon charge-icon">↥</div><div class="control-info"><h4>Charge MOS</h4><p>Đường MOSFET sạc pin</p></div><span id="ctrl-charge" class="state-pill neutral">--</span></div>
+      <div class="control-card"><div class="control-icon discharge-icon">↧</div><div class="control-info"><h4>Discharge MOS</h4><p>Đường MOSFET xả pin</p></div><span id="ctrl-discharge" class="state-pill neutral">--</span></div>
+      <div class="control-card"><div class="control-icon balance-icon">⇌</div><div class="control-info"><h4>Cân bằng cell</h4><p>Active balancing</p></div><span id="ctrl-balance" class="state-pill neutral">--</span></div>
+      <div class="control-card"><div class="control-icon reboot-icon">↻</div><div class="control-info"><h4>Reboot BMS</h4><p>Khởi động lại bộ điều khiển</p></div><button id="btn-reboot" class="action disabled-action" disabled title="Chưa xác minh mã lệnh reboot cho thiết bị này">Chưa hỗ trợ</button></div>
+    </div>
+  </div>
+  <div class="panel info-panel"><div class="row-title"><h3>Thông tin điều khiển</h3><span>Đọc / ghi</span></div>
+    <div class="info-list">
+      <div><span>Thiết bị hiện tại</span><strong id="ctrl-device-name">Chưa kết nối</strong></div>
+      <div><span>Giao thức nhận dạng</span><strong id="ctrl-device-protocol">--</strong></div>
+      <div><span>Quyền thay đổi thông số</span><strong>Chưa hỗ trợ trên firmware hiện tại của PC Studio</strong></div>
+    </div>
+  </div>
+</section>
+<section id="protection" class="view">
+  <div class="panel">
+    <div class="row-title"><div><h3>Cấu hình bảo vệ</h3><p class="section-subtitle">Nhóm tham số điện áp, dòng điện, nhiệt độ và cân bằng của JK BMS</p></div><span id="protection-status" class="soft-chip">Chưa nhận cấu hình</span></div>
+    <div class="protection-overview">
+      <div class="mini-kpi"><span>KHUNG CẤU HÌNH</span><strong id="settings-frame-state">--</strong><small id="settings-frame-detail">Chờ phản hồi BLE 0x01</small></div>
+      <div class="mini-kpi"><span>CHẾ ĐỘ</span><strong>Chỉ đọc</strong><small>Không gửi lệnh ghi BMS</small></div>
+      <div class="mini-kpi"><span>SAO LƯU THÔ</span><strong>RAW BLE</strong><small>Chọn “Xuất dữ liệu” để lưu khung gốc</small></div>
+    </div>
+    <div class="protection-table-wrap"><table class="protection-table"><thead><tr><th>Nhóm</th><th>Thông số</th><th>Giá trị BMS</th><th>Đơn vị</th><th>Tình trạng giải mã</th></tr></thead>
+      <tbody id="protection-body">
+        <tr><td>Điện áp</td><td>Cell Over Voltage Protection (OVP)</td><td>--</td><td>V</td><td>Chưa xác minh offset</td></tr>
+        <tr><td>Điện áp</td><td>Cell Under Voltage Protection (UVP)</td><td>--</td><td>V</td><td>Chưa xác minh offset</td></tr>
+        <tr><td>Dòng điện</td><td>Charge Over Current Protection</td><td>--</td><td>A</td><td>Chưa xác minh offset</td></tr>
+        <tr><td>Dòng điện</td><td>Discharge Over Current Protection</td><td>--</td><td>A</td><td>Chưa xác minh offset</td></tr>
+        <tr><td>Nhiệt độ</td><td>Charge / Discharge Over Temperature</td><td>--</td><td>°C</td><td>Chưa xác minh offset</td></tr>
+        <tr><td>Nhiệt độ</td><td>Low Temperature Protection</td><td>--</td><td>°C</td><td>Chưa xác minh offset</td></tr>
+        <tr><td>Cân bằng</td><td>Start Voltage / Trigger Delta</td><td>--</td><td>V / mV</td><td>Chưa xác minh offset</td></tr>
+        <tr><td>Khác</td><td>Protection Release / Recovery Delay</td><td>--</td><td>s</td><td>Chưa xác minh offset</td></tr>
+      </tbody></table></div>
+    <p class="subtle-note">Khung Settings có thể đã nhận, nhưng giá trị bảo vệ chỉ được hiển thị khi xác nhận đúng bảng thanh ghi của model. Không dùng các giá trị suy đoán để cấu hình pin.</p>
+  </div>
+</section>
+<section id="diagnostics" class="view">
+  <div class="panel">
+    <div class="row-title"><div><h3>Nhật ký Bluetooth BLE</h3><p class="section-subtitle">Kiểm tra kết nối, loại khung nhận và chẩn đoán giao thức JK</p></div><div class="diagnostic-actions"><button id="copy-log" class="action secondary-action">Sao chép log</button><button id="clear-log" class="action secondary-action">Xóa log</button></div></div>
+    <div class="diagnostic-grid">
+      <div class="mini-kpi"><span>SETTINGS 0x01</span><strong id="frame-settings">0</strong><small>Khung cấu hình</small></div>
+      <div class="mini-kpi"><span>TELEMETRY 0x02</span><strong id="frame-telemetry">0</strong><small>Dữ liệu cell</small></div>
+      <div class="mini-kpi"><span>DEVICE INFO 0x03</span><strong id="frame-info">0</strong><small>Thông tin thiết bị</small></div>
+      <div class="mini-kpi"><span>CẬP NHẬT CUỐI</span><strong id="frame-last">--</strong><small>Giờ máy tính</small></div>
+    </div>
+    <textarea class="log" id="ble-log" readonly spellcheck="false" placeholder="Kết nối thiết bị để nhận nhật ký BLE..."></textarea>
+  </div>
+</section>
+
 </main></div><script>
 'use strict';
 const $=id=>document.getElementById(id);
