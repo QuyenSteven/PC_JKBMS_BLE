@@ -10,17 +10,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: microsoft/setup-msbuild@v2
+      - uses: NuGet/setup-nuget@v2
       - name: Restore NuGet dependencies
         run: |
-          nuget restore JK_BMS_PC.sln -PackagesDirectory packages
+          nuget restore JK_BMS_PC.sln -PackagesDirectory packages -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "NuGet packages.config restore failed" }
+          if (-not (Test-Path "packages/Microsoft.Web.WebView2.1.0.2903.40/build/native/include/WebView2.h")) { throw "WebView2.h missing after restore" }
           msbuild JK_BMS_PC.vcxproj -t:Restore -p:Configuration=Release -p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { throw "CppWinRT PackageReference restore failed" }
       - name: Build Windows x64 Release
-        run: msbuild JK_BMS_PC.vcxproj /m /p:Configuration=Release /p:Platform=x64
+        run: |
+          msbuild JK_BMS_PC.vcxproj /m /p:Configuration=Release /p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { throw "C++ build failed" }
       - uses: actions/upload-artifact@v4
         with:
           name: JK-BMS-PC-Windows-x64
           path: |
             x64/Release/*.exe
             x64/Release/web/index.html
-            x64/Release/WebView2Loader.dll
           if-no-files-found: error
