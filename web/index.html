@@ -114,6 +114,25 @@
 .temperature-card.hot{border-color:#985d4e;background:#332733}.temperature-card.hot strong{color:#ffb19c}
 @media(max-width:1150px){.temperature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:660px){.temperature-grid{grid-template-columns:1fr}}
+
+.device-admin-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:21px 0}
+.device-kpi-text{font-size:18px!important;letter-spacing:0!important;white-space:normal!important;overflow-wrap:anywhere}
+.device-admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.device-admin-card{background:#101b2b;border:1px solid #2b4156;border-radius:15px;padding:21px;min-width:0}
+.device-admin-card h4{margin:0 0 11px;color:#e5f1fb;font-size:17px}
+.device-admin-card p{margin:0 0 17px;color:#9cb5c9;font-size:13px;line-height:1.7}
+.device-admin-card label{display:block;font-size:12px;color:#b1c9dc;margin:0 0 9px}
+.device-inline-form{display:flex;flex-wrap:wrap;gap:8px}
+.device-inline-form input{flex:1 1 180px;min-width:0;padding:11px 13px;border-radius:9px;border:1px solid #385268;background:#0c1725;color:#eef8ff;outline:none;font-size:14px}
+.device-inline-form input:focus{border-color:#24c5a7}
+.device-inline-form .action{font-size:12px;padding:10px 12px}
+.device-info-note{background:#1a2b3c;border:1px solid #334c60;border-radius:11px;padding:13px 15px;color:#a7bdcf;font-size:12px;line-height:1.7}
+.device-info-note strong{color:#d9e9f4}
+.device-hint{display:block;margin-top:12px;color:#8ba8bb;font-size:12px}
+.device-guide-link{display:inline-block;margin-right:9px;margin-top:4px;padding:10px 13px;background:#18493f;color:#83efd4!important;border:1px solid #227a68;border-radius:10px;font-size:12px;text-decoration:none;font-weight:650}
+.device-guide-link.secondary{background:#203044;color:#c2d7e9!important;border-color:#38516b}
+@media(max-width:1080px){.device-admin-grid{grid-template-columns:1fr}}
+@media(max-width:850px){.device-admin-summary{grid-template-columns:1fr}}
 </style></head>
 <body><div class="shell">
 <aside><div class="brand"><div class="symbol">JK</div><div><strong>JK BMS</strong><small>DESKTOP STUDIO</small></div></div>
@@ -122,6 +141,7 @@
 <button data-page="cells">▦ &nbsp; Cell pin</button>
 <button data-page="control">⚡ &nbsp; Điều khiển</button>
 <button data-page="protection">⬡ &nbsp; Bảo vệ</button>
+<button data-page="device-admin">⚙ &nbsp; Thiết bị / Mật khẩu</button>
 <button data-page="diagnostics">≡ &nbsp; BLE / Nhật ký</button>
 </nav><div class="side-bottom"><div class="micro">THIẾT BỊ BLUETOOTH</div><div class="sidebar-connection"><i id="side-dot"></i><span id="side-status">Chưa kết nối</span></div><div class="sidebar-version">JK BMS Studio · BLE</div></div></aside>
 <main><header><div><h1>Quản lý hệ thống pin</h1><p class="sub">Giám sát JK BMS thời gian thực qua Bluetooth Low Energy</p></div><span class="status" id="connection-status"><b></b> Chưa kết nối</span></header>
@@ -203,6 +223,45 @@
   </table></div>
   <div class="settings-guard"><strong>Kiểm soát ghi:</strong> xác nhận từng đợt thay đổi, giới hạn dữ liệu theo thanh ghi; không đánh dấu thành công khi Windows chỉ báo đã gửi. Mỗi tham số phải được đọc lại từ BMS hai lần trùng khớp.</div>
  </div>
+</section>
+<section id="device-admin" class="view">
+  <div class="panel">
+    <div class="row-title"><div><h3>Thông tin thiết bị và bảo mật</h3><p class="section-subtitle">Quản lý tên hiển thị trên PC và thông tin xác thực của JK BMS</p></div><span class="soft-chip" id="device-admin-status">Chờ BLE</span></div>
+    <div class="device-admin-summary">
+      <div class="mini-kpi"><span>TÊN THẬT BMS</span><strong id="device-native-name" class="device-kpi-text">--</strong><small>Đọc trực tiếp từ Device Info 0x03</small></div>
+      <div class="mini-kpi"><span>MODEL / FIRMWARE</span><strong id="device-native-model" class="device-kpi-text">--</strong><small id="device-native-firmware">Chưa nhận thông tin</small></div>
+      <div class="mini-kpi"><span>SỐ SERIAL</span><strong id="device-native-serial" class="device-kpi-text">--</strong><small>Thông tin dùng khi liên hệ hỗ trợ</small></div>
+    </div>
+    <div class="device-admin-grid">
+      <div class="device-admin-card">
+        <h4>Đặt tên trên máy tính</h4>
+        <p>Đổi tên hiển thị trong JK BMS Studio để phân biệt các bộ pin. Không thay đổi tên quảng bá BLE trên BMS.</p>
+        <label for="device-local-name">Tên hiển thị trong ứng dụng PC</label>
+        <div class="device-inline-form">
+          <input id="device-local-name" type="text" maxlength="32" placeholder="Ví dụ: PIN_SOLAR_8S" autocomplete="off">
+          <button id="device-local-save" class="action primary" disabled>Lưu tên PC</button>
+          <button id="device-local-reset" class="action" disabled>Xóa tên PC</button>
+        </div>
+        <small id="device-local-feedback" class="device-hint">Chọn một thiết bị BLE để đặt tên.</small>
+      </div>
+      <div class="device-admin-card">
+        <h4>Đổi tên trực tiếp trên BMS</h4>
+        <p>Ứng dụng JK trên điện thoại cho phép thay đổi tên BLE. Firmware có bộ lệnh ghi riêng, chưa được xác nhận trên PC.</p>
+        <div class="device-info-note">Hiện tại phần mềm <strong>không gửi lệnh đổi tên thật</strong> để tránh ghi sai vào vùng Device Info. Trong ứng dụng JK điện thoại: chọn thiết bị → biểu tượng bút → đổi tên → OK.</div>
+      </div>
+      <div class="device-admin-card">
+        <h4>Đổi mật khẩu thiết bị</h4>
+        <p>Theo hướng dẫn JK, đổi mật khẩu kết nối cần nhập mật khẩu hiện tại rồi xác nhận mật khẩu mới hai lần.</p>
+        <div class="device-info-note">Không lưu hoặc hiển thị mật khẩu từ khung BLE. Hãy dùng chức năng đổi mật khẩu chính thức trong app JK cho đến khi xác minh được opcode ghi trên firmware này.</div>
+      </div>
+      <div class="device-admin-card">
+        <h4>Quên mật khẩu / Khôi phục truy cập</h4>
+        <p>Không chạy lệnh “unlock” hoặc reset toàn bộ cấu hình BMS. Nhà cung cấp JK có hướng dẫn sử dụng serial để yêu cầu mật khẩu tạm thời.</p>
+        <a class="device-guide-link" href="https://jkbms-ess.com/de/blogs/news/how-to-modify-your-app-password" target="_blank" rel="noopener noreferrer">Hướng dẫn lấy lại mật khẩu chính thức ↗</a>
+        <a class="device-guide-link secondary" href="https://jkbms-ess.com/pages/support" target="_blank" rel="noopener noreferrer">Hỗ trợ sau bán hàng ↗</a>
+      </div>
+    </div>
+  </div>
 </section>
 <section id="diagnostics" class="view">
   <div class="panel">
@@ -503,4 +562,4 @@ if(window.chrome && window.chrome.webview){
 }else{
   note('Đang xem giao diện HTML. Chức năng BLE chỉ hoạt động trong JK BMS Studio.');
 }
-</script><script src="settings.js"></script></body></html>
+</script><script src="settings.js"></script><script src="device.js"></script></body></html>
