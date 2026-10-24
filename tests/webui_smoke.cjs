@@ -51,6 +51,21 @@ assert.equal(element('overview-temp1').textContent,'25.3 °C');
 assert.equal(element('overview-temp2').textContent,'30.1 °C');
 assert.equal(element('overview-temp-mos').textContent,'42.5 °C');
 assert.equal(element('overview-temp3').textContent,'31.0 °C');
+assert.equal(element('extra-temperatures').hidden,true); // T5 only; always show T3/T4
+assert.ok(html.includes('<div class="temperature-icon">T3</div>'));
+assert.ok(html.includes('<div class="temperature-icon">T4</div>'));
+assert.ok(html.indexOf('overview-temp3') < html.indexOf('id="extra-temperatures"'));
+assert.ok(html.indexOf('overview-temp4') < html.indexOf('id="extra-temperatures"'));
+emit({type:'telemetry',protocol:'JK02_32S',packVerified:true,voltage:26.77,current:0,power:0,soc:100,
+ charge:1,discharge:0,balance:0,temperature1:23.1,temperature2:23.2,mosTemperature:28.4,temperature3:null,temperature4:null,temperature5:null,
+ cells:[3.348,3.348,3.345,3.345,3.348,3.345,3.345,3.345]});
+assert.equal(element('overview-temp3').textContent,'-- °C');
+assert.equal(element('overview-temp4').textContent,'-- °C');
+assert.equal(element('extra-temperatures').hidden,true);
+emit({type:'telemetry',protocol:'JK02_32S',packVerified:true,voltage:26.77,current:0,power:0,soc:100,
+ charge:1,discharge:0,balance:0,temperature1:23.1,temperature2:23.2,mosTemperature:28.4,temperature3:24.3,temperature4:25.4,temperature5:26.5,
+ cells:[3.348,3.348,3.345,3.345,3.348,3.345,3.345,3.345]});
+assert.equal(element('overview-temp4').textContent,'25.4 °C');
 assert.equal(element('extra-temperatures').hidden,false);
 assert.equal(element('cell-grid-page').children.length,8);
 assert.equal(element('cell-bars').children.length,8);

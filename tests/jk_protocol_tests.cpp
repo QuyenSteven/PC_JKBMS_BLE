@@ -41,7 +41,21 @@ int main(){
   assert(t->temperature1&&std::abs(*t->temperature1-25.3)<0.01);
   assert(t->temperature2&&std::abs(*t->temperature2-30.1)<0.01);
   assert(t->mosTemperature&&std::abs(*t->mosTemperature-42.5)<0.01);
-  if(p==jk::Protocol::JK02_32S)assert(t->temperature3&&std::abs(*t->temperature3-31.0)<0.01);
+  if(p==jk::Protocol::JK02_32S){
+   assert(t->temperature3&&std::abs(*t->temperature3-31.0)<0.01);
+   assert(t->temperature4&&std::abs(*t->temperature4-29.5)<0.01);
+   assert(t->temperature5&&std::abs(*t->temperature5-27.0)<0.01);
+   auto flagged=frame;
+   put16(flagged,214,0x003F); // some JK boards report an inconsistent absent mask
+   crc(flagged);
+   auto v=jk::decodeJk02(flagged,p);
+   assert(v && v->temperature1 && v->temperature2 && v->mosTemperature);
+   assert(v->temperature3&&v->temperature4&&v->temperature5);
+   put16(flagged,256,0); // physically absent T4 with zeroed slot
+   crc(flagged);
+   v=jk::decodeJk02(flagged,p);
+   assert(v&&!v->temperature4&&v->temperature3);
+  }
   assert(std::abs(t->voltage-26.428)<0.001);
   jk::FrameAssembler assembler;int frames=0;
   assembler.add(std::vector<uint8_t>(frame.begin(),frame.begin()+3),[&](auto const&){frames++;});
