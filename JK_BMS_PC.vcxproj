@@ -17,7 +17,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard><AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>WIN32;_WINDOWS;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(WebView2NativeDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -29,7 +29,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup><ClCompile Include="src\main.cpp" /></ItemGroup>
-  <ItemGroup><None Include="web\index.html" /><None Include="packages.config" /></ItemGroup>
+  <ItemGroup><None Include="web\index.html" /><None Include="web\settings.js" /><None Include="packages.config" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 
   <Target Name="VerifyWebView2Sdk" BeforeTargets="ClCompile">
@@ -38,6 +38,6 @@
   </Target>
   <Target Name="CopyWebUI" AfterTargets="Build">
     <MakeDir Directories="$(TargetDir)web" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\web\index.html" DestinationFiles="$(TargetDir)web\index.html" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\web\index.html;$(MSBuildProjectDirectory)\web\settings.js" DestinationFiles="$(TargetDir)web\index.html;$(TargetDir)web\settings.js" SkipUnchangedFiles="true" />
   </Target>
 </Project>
