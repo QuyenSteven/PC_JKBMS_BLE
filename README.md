@@ -37,3 +37,12 @@ Ghi tham số bảo vệ có thể khiến BMS ngắt tải, sạc hoặc bảo 
 - [syssi/esphome-jk-bms decoder & settings register map](https://github.com/syssi/esphome-jk-bms/tree/main/components/jk_bms_ble)
 - `src/jk_protocol.h` và `src/jk_settings.h` chứa bảng mã hóa/giải mã.
 - `tests/jk_protocol_tests.cpp`, `tests/webui_smoke.cjs`, `tests/settings_ui_smoke.cjs` là kiểm thử hồi quy trong GitHub Actions.
+
+## Nhiệt độ, hiệu chỉnh SOC và quản lý thiết bị
+
+- **Tổng quan:** T1, T2, nhiệt độ MOSFET được đọc từ telemetry JK02; JK02_32S còn đọc T3–T5 nếu phần cứng có cảm biến. Cảm biến không có dữ liệu sẽ hiện `--` (không tạo giá trị giả). JK04 chưa có offset nhiệt độ đã xác minh nên sẽ hiện `--`.
+- **Cấu hình:** JK02 cho phép điều chỉnh ngưỡng điện áp SOC 100% và SOC 0% qua thanh ghi `0x07/0x08`; hệ thống kiểm tra ngưỡng SOC 100% phải lớn hơn SOC 0%.
+- **Số cell cấu hình:** JK02 ghi thanh ghi `0x1C` nhưng PC **chỉ chấp nhận số cell đúng bằng số cell quan sát thực tế** trong telemetry. Đổi sai số cell có thể làm mất bảo vệ.
+- **Thiết bị / Mật khẩu:** Đọc tên gốc JK, model, firmware, serial; hỗ trợ đặt tên hiển thị riêng trên PC cho từng địa chỉ BLE. Đây chỉ là alias lưu trong WebView2, **không đổi tên BLE thực trên BMS**.
+- **Đổi mật khẩu và tên gốc BMS:** ứng dụng điện thoại JK có chức năng chính thức nhưng opcode BLE chưa xác minh trong PC Studio, nên PC không gửi các lệnh ghi này. Không đọc hoặc hiển thị mật khẩu trả về trong Device Info.
+- **Quên mật khẩu:** dùng cách khôi phục chính thức dựa trên serial từ [JK BMS hướng dẫn](https://jkbms-ess.com/de/blogs/news/how-to-modify-your-app-password) hoặc [hỗ trợ sau bán hàng](https://jkbms-ess.com/pages/support). Không tự động bypass, unlock hoặc factory reset.

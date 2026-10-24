@@ -37,7 +37,7 @@ struct Telemetry {
  std::vector<double> cells;
  double voltage=0, current=0, power=0;
  int soc=-1, charge=-1, discharge=-1, balance=-1;
- double temperature1=0,temperature2=0;
+ std::optional<double> temperature1,temperature2,mosTemperature,temperature3,temperature4,temperature5;
  uint32_t alarms=0;
  bool packVerified=false; // JK04 pack voltage/SOC not decoded yet.
 };
@@ -60,8 +60,31 @@ inline std::optional<Telemetry> decodeJk02(std::vector<uint8_t> const& f,Protoco
  t.power=t.voltage*t.current;
  t.soc=f[141+off];t.charge=f[166+off];t.discharge=f[167+off];
  t.balance=f[140+off]!=0?1:0;
- t.temperature1=static_cast<int16_t>(u16(f,130+off))*0.1;
- t.temperature2=static_cast<int16_t>(u16(f,132+off))*0.1;
+ auto temperature=[&](size_t location)->std::optional<double>{
+  if(location+1>=f.size())return {};
+  double value=static_cast<int16_t>(u16(f,location))*0.1;
+  if(!std::isfinite(value)||value < -55.0||value > 145.0)return {};
+  return value;
+ };
+ // JK02 24S and 32S share T1 and T2 at 130/132 + cell-layout offset.
+ // MOS sensor differs: 24S at 134; 32S at 112 + 2*offset (=176).
+ t.temperature1=temperature(130+off);
+ t.temperature2=temperature(132+off);
+ t.mosTemperature=temperature(p==Protocol::JK02_32S?112+2*off:134);
+ if(p==Protocol::JK02_32S){
+  // Additional probes only exist on selected JK02_32S boards.
+  if(u16(f,226+off)!=0)t.temperature3=temperature(226+off);
+  if(u16(f,224+off)!=0)t.temperature4=temperature(224+off);
+  if(u16(f,222+off)!=0)t.temperature5=temperature(222+off);
+ }
+ // Temperature sensor absent flags (bit0 MOS, bits1..5 T1..T5).
+ uint16_t absent=u16(f,182+off);
+ if(absent&(1u<<0))t.mosTemperature.reset();
+ if(absent&(1u<<1))t.temperature1.reset();
+ if(absent&(1u<<2))t.temperature2.reset();
+ if(absent&(1u<<3))t.temperature3.reset();
+ if(absent&(1u<<4))t.temperature4.reset();
+ if(absent&(1u<<5))t.temperature5.reset();
  t.alarms=p==Protocol::JK02_32S?u32(f,134+off):u16(f,136+off);
  if(t.voltage<5.0||t.voltage>200.0||std::abs(t.current)>3000||t.soc>100)return {};
  if(std::abs(t.voltage-sum)>std::max(1.2,sum*0.08))return {};

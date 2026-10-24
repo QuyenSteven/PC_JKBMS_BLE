@@ -20,6 +20,12 @@ static std::vector<uint8_t> jk02(jk::Protocol p){
  put32(b,118+off,(uint32_t)total);
  put32(b,126+off,(uint32_t)(int32_t)-2500);
  b[141+off]=78;b[166+off]=1;b[167+off]=0;b[140+off]=1;
+ put16(b,130+off,253); // T1 25.3C
+ put16(b,132+off,301); // T2 30.1C
+ put16(b,p==jk::Protocol::JK02_32S?176:134,425); // MOS 42.5C
+ if(p==jk::Protocol::JK02_32S){
+   put16(b,254,270);put16(b,256,295);put16(b,258,310);
+ }
  crc(b);return b;
 }
 int main(){
@@ -32,6 +38,10 @@ int main(){
   assert(t&&t->protocol==p&&t->packVerified);
   assert(t->cells.size()==8 && std::abs(t->current+2.5)<0.01);
   assert(t->soc==78 && t->charge==1 && t->discharge==0 && t->balance==1);
+  assert(t->temperature1&&std::abs(*t->temperature1-25.3)<0.01);
+  assert(t->temperature2&&std::abs(*t->temperature2-30.1)<0.01);
+  assert(t->mosTemperature&&std::abs(*t->mosTemperature-42.5)<0.01);
+  if(p==jk::Protocol::JK02_32S)assert(t->temperature3&&std::abs(*t->temperature3-31.0)<0.01);
   assert(std::abs(t->voltage-26.428)<0.001);
   jk::FrameAssembler assembler;int frames=0;
   assembler.add(std::vector<uint8_t>(frame.begin(),frame.begin()+3),[&](auto const&){frames++;});
@@ -75,6 +85,19 @@ int main(){
   assert(!jk::encodeValue(*uvp,p,0.5));
   assert(jk::encodeValue(*uvp,p,2.95));
   assert(jk::findSetting("charge_mos")&&jk::canWrite(*jk::findSetting("charge_mos"),p));
+  auto socFull=jk::findSetting("soc100_voltage"),socEmpty=jk::findSetting("soc0_voltage"),cells=jk::findSetting("cell_count");
+  assert(socFull&&socEmpty&&cells);
+  assert(jk::canWrite(*socFull,p)&&jk::canWrite(*socEmpty,p)&&jk::canWrite(*cells,p));
+  put32(settings,30,3550);put32(settings,34,2700);put32(settings,114,8);
+  assert(jk::crossCheck("soc100_voltage",3.6,settings,p));
+  assert(!jk::crossCheck("soc100_voltage",2.6,settings,p));
+  assert(jk::crossCheck("soc0_voltage",2.65,settings,p));
+  assert(!jk::crossCheck("soc0_voltage",3.6,settings,p));
+  auto cmdSoc=jk::settingWriteFrame(*socFull,p,3.6);
+  assert(cmdSoc[4]==0x07 && cmdSoc[5]==4 && (uint32_t(cmdSoc[6])+(uint32_t(cmdSoc[7])<<8))==3600);
+  auto cmdCell=jk::settingWriteFrame(*cells,p,8);
+  assert(cmdCell[4]==0x1C && cmdCell[5]==4 && cmdCell[6]==8);
+  assert(jk::readSetting(settings,*cells,p)==8);
  }
  std::vector<uint8_t> settings04(300);
  settings04[4]=1;put32(settings04,34,16);

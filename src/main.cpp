@@ -69,6 +69,7 @@ std::vector<uint8_t> latestSettings;
 ULONGLONG lastSettingsMs=0;
 std::wstring activeModel,activeHardware,activeSoftware,activeSerial,activeMac;
 std::atomic<jk::Protocol> observedProtocol{jk::Protocol::Auto};
+std::atomic<int> observedCells{0};
 struct PendingWrite{
  std::string key;double value=0;
  uint32_t raw=0; jk::Protocol protocol=jk::Protocol::Auto;
@@ -169,7 +170,7 @@ void disconnectBms(){
   pendingWrite.reset();latestSettings.clear();lastSettingsMs=0;
   activeModel.clear();activeHardware.clear();activeSoftware.clear();activeSerial.clear();activeMac.clear();
  }
- observedProtocol=jk::Protocol::Auto;
+ observedProtocol=jk::Protocol::Auto;observedCells=0;
  emit(L"{\"type\":\"settingsClear\"}");
  stopScanner();
  {std::lock_guard lock(frameMutex);frames.reset();}
@@ -210,7 +211,7 @@ void parseFrame(std::vector<uint8_t> const& b){
    activeSoftware=parseAscii(b,30,8);
    activeSerial=parseAscii(b,86,11);
   }
-  emit(L"{\"type\":\"deviceInfo\",\"serial\":\""+jsonEscape(parseAscii(b,86,11))+L"\",\"model\":\""+jsonEscape(parseAscii(b,6,16))+
+  emit(L"{\"type\":\"deviceInfo\",\"deviceName\":\""+jsonEscape(parseAscii(b,46,16))+L"\",\"serial\":\""+jsonEscape(parseAscii(b,86,11))+L"\",\"model\":\""+jsonEscape(parseAscii(b,6,16))+
        L"\",\"hardware\":\""+jsonEscape(parseAscii(b,22,8))+
        L"\",\"firmware\":\""+jsonEscape(parseAscii(b,30,8))+L"\"}");
   emitSettings();
@@ -252,6 +253,7 @@ void parseFrame(std::vector<uint8_t> const& b){
  auto decoded=jk::decode(b,protocol.load());
  if(!decoded){log(L"RX 0x02 hợp lệ CRC, chưa giải mã được model đang chọn.");return;}
  auto& t=*decoded;
+ observedCells=static_cast<int>(t.cells.size());
  if(observedProtocol!=t.protocol){observedProtocol=t.protocol;emitSettings();}
  std::wstringstream json;
  json<<L"{\"type\":\"telemetry\",\"protocol\":\"";
@@ -264,6 +266,17 @@ void parseFrame(std::vector<uint8_t> const& b){
       <<L",\"soc\":"<<t.soc<<L",\"charge\":"<<t.charge
       <<L",\"discharge\":"<<t.discharge<<L",\"balance\":"<<t.balance;
  }
+ auto addTemperature=[&](wchar_t const* name,std::optional<double> const& v){
+  json<<L",\""<<name<<L"\":";
+  if(v&&std::isfinite(*v))json<<std::fixed<<std::setprecision(1)<<*v;
+  else json<<L"null";
+ };
+ addTemperature(L"temperature1",t.temperature1);
+ addTemperature(L"temperature2",t.temperature2);
+ addTemperature(L"mosTemperature",t.mosTemperature);
+ addTemperature(L"temperature3",t.temperature3);
+ addTemperature(L"temperature4",t.temperature4);
+ addTemperature(L"temperature5",t.temperature5);
  json<<L",\"packVerified\":"<<(t.packVerified?L"true":L"false")<<L"}";
  emit(json.str());
 }
@@ -351,6 +364,11 @@ void changeSetting(std::wstring const& payload){
  if(!writeChar||p==jk::Protocol::Auto||observedProtocol.load()!=p||model.empty()||
     baseline.size()!=300||!age||GetTickCount64()-age>30000){
   settingStatus(key,L"failed",L"Cần kết nối, nhận dạng firmware và đọc Settings mới trong 30 giây trước khi ghi.");return;
+ }
+ if(key=="cell_count" && (observedCells.load()<2||
+    (p==jk::Protocol::JK02_24S&&value>24)||
+    static_cast<int>(value)!=observedCells.load())){
+  settingStatus(key,L"failed",L"Số cell yêu cầu phải khớp số cell đo được từ telemetry; không thể khai báo sai cấu hình phần cứng.");return;
  }
  if(!jk::canWrite(*spec,p)||!jk::validSetting(*spec,value)||!jk::crossCheck(key,value,baseline,p)){
   settingStatus(key,L"failed",L"Model không hỗ trợ hoặc giá trị vượt giới hạn / xung đột bảo vệ.");return;

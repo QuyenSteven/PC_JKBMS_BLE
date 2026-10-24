@@ -101,6 +101,38 @@
 .control-toggle{font-size:12px!important;padding:9px 12px!important;min-width:110px}
 .control-toggle:disabled{cursor:not-allowed;opacity:.4}
 @media(max-width:860px){.config-toolbar .action.primary{margin-left:0}.control-actions{margin-left:auto}}
+
+.temperature-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 2px 12px;color:#9cbbd1;font-size:11px;font-weight:750;letter-spacing:1.1px}
+.temperature-heading small{color:#87a6bd;font-size:11px;letter-spacing:0;font-weight:500}
+.temperature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.temperature-extra{margin-top:9px}
+.temperature-grid[hidden]{display:none}
+.temperature-card{display:flex;gap:10px;align-items:center;background:#101b2b;border:1px solid #273b4d;border-radius:12px;padding:12px 10px;min-width:0;min-height:80px}
+.temperature-icon{flex:0 0 36px;width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:#244353;color:#6bdac7;font-size:12px;font-weight:800}
+.temperature-icon.mos{color:#ffd29a;background:#46382f;font-size:10px}
+.temperature-info{min-width:0}.temperature-info span{display:block;color:#93afc3;font-size:11px}.temperature-info strong{display:block;color:#f1f7fc;font-size:22px;letter-spacing:-.3px;margin-top:6px;white-space:nowrap}
+.temperature-card.hot{border-color:#985d4e;background:#332733}.temperature-card.hot strong{color:#ffb19c}
+@media(max-width:1150px){.temperature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:660px){.temperature-grid{grid-template-columns:1fr}}
+
+.device-admin-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:21px 0}
+.device-kpi-text{font-size:18px!important;letter-spacing:0!important;white-space:normal!important;overflow-wrap:anywhere}
+.device-admin-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.device-admin-card{background:#101b2b;border:1px solid #2b4156;border-radius:15px;padding:21px;min-width:0}
+.device-admin-card h4{margin:0 0 11px;color:#e5f1fb;font-size:17px}
+.device-admin-card p{margin:0 0 17px;color:#9cb5c9;font-size:13px;line-height:1.7}
+.device-admin-card label{display:block;font-size:12px;color:#b1c9dc;margin:0 0 9px}
+.device-inline-form{display:flex;flex-wrap:wrap;gap:8px}
+.device-inline-form input{flex:1 1 180px;min-width:0;padding:11px 13px;border-radius:9px;border:1px solid #385268;background:#0c1725;color:#eef8ff;outline:none;font-size:14px}
+.device-inline-form input:focus{border-color:#24c5a7}
+.device-inline-form .action{font-size:12px;padding:10px 12px}
+.device-info-note{background:#1a2b3c;border:1px solid #334c60;border-radius:11px;padding:13px 15px;color:#a7bdcf;font-size:12px;line-height:1.7}
+.device-info-note strong{color:#d9e9f4}
+.device-hint{display:block;margin-top:12px;color:#8ba8bb;font-size:12px}
+.device-guide-link{display:inline-block;margin-right:9px;margin-top:4px;padding:10px 13px;background:#18493f;color:#83efd4!important;border:1px solid #227a68;border-radius:10px;font-size:12px;text-decoration:none;font-weight:650}
+.device-guide-link.secondary{background:#203044;color:#c2d7e9!important;border-color:#38516b}
+@media(max-width:1080px){.device-admin-grid{grid-template-columns:1fr}}
+@media(max-width:850px){.device-admin-summary{grid-template-columns:1fr}}
 </style></head>
 <body><div class="shell">
 <aside><div class="brand"><div class="symbol">JK</div><div><strong>JK BMS</strong><small>DESKTOP STUDIO</small></div></div>
@@ -109,6 +141,7 @@
 <button data-page="cells">▦ &nbsp; Cell pin</button>
 <button data-page="control">⚡ &nbsp; Điều khiển</button>
 <button data-page="protection">⬡ &nbsp; Bảo vệ</button>
+<button data-page="device-admin">⚙ &nbsp; Thiết bị / Mật khẩu</button>
 <button data-page="diagnostics">≡ &nbsp; BLE / Nhật ký</button>
 </nav><div class="side-bottom"><div class="micro">THIẾT BỊ BLUETOOTH</div><div class="sidebar-connection"><i id="side-dot"></i><span id="side-status">Chưa kết nối</span></div><div class="sidebar-version">JK BMS Studio · BLE</div></div></aside>
 <main><header><div><h1>Quản lý hệ thống pin</h1><p class="sub">Giám sát JK BMS thời gian thực qua Bluetooth Low Energy</p></div><span class="status" id="connection-status"><b></b> Chưa kết nối</span></header>
@@ -116,7 +149,18 @@
 <div class="panel device"><div><div class="micro">THIẾT BỊ ĐƯỢC CHỌN</div><h2 id="device-label">Chưa chọn JK BMS</h2><small id="device-detail">Bluetooth • Đang chờ kết nối</small></div><select id="device-list" aria-label="Thiết bị tìm được"><option value="">Chọn thiết bị BLE...</option></select><span class="tag" id="device-status">OFFLINE</span></div>
 <section id="overview" class="view active">
 <div class="metrics"><div class="panel metric"><div class="label">ĐIỆN ÁP PACK</div><div id="pack-voltage" class="value">--<span class="unit"> V</span></div><div class="hint">Điện áp tổng</div></div><div class="panel metric"><div class="label">DÒNG ĐIỆN</div><div id="pack-current" class="value">--<span class="unit"> A</span></div><div class="hint">Sạc / xả</div></div><div class="panel metric"><div class="label">CÔNG SUẤT</div><div id="pack-power" class="value">--<span class="unit"> W</span></div><div class="hint">Công suất tức thời</div></div><div class="panel metric"><div class="label">DUNG LƯỢNG SOC</div><div id="pack-soc" class="value">--<span class="unit"> %</span></div><div class="hint">Dung lượng còn lại</div></div></div>
-<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span id="overview-cell-status">Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
+<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span id="overview-cell-status">Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div>
+<div class="temperature-heading"><span>NHIỆT ĐỘ BMS</span><small id="temperature-update-state">Chưa có dữ liệu</small></div>
+<div class="temperature-grid">
+  <div class="temperature-card"><div class="temperature-icon">T1</div><div class="temperature-info"><span>Cảm biến nhiệt T1</span><strong id="overview-temp1">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T2</div><div class="temperature-info"><span>Cảm biến nhiệt T2</span><strong id="overview-temp2">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon mos">MOS</div><div class="temperature-info"><span>Nhiệt độ MOSFET</span><strong id="overview-temp-mos">-- °C</strong></div></div>
+</div>
+<div id="extra-temperatures" class="temperature-grid temperature-extra" hidden>
+  <div class="temperature-card"><div class="temperature-icon">T3</div><div class="temperature-info"><span>Cảm biến nhiệt T3</span><strong id="overview-temp3">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T4</div><div class="temperature-info"><span>Cảm biến nhiệt T4</span><strong id="overview-temp4">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T5</div><div class="temperature-info"><span>Cảm biến nhiệt T5</span><strong id="overview-temp5">-- °C</strong></div></div>
+</div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
 </section>
 <section id="cells" class="view">
   <div class="panel cell-dashboard">
@@ -179,6 +223,45 @@
   </table></div>
   <div class="settings-guard"><strong>Kiểm soát ghi:</strong> xác nhận từng đợt thay đổi, giới hạn dữ liệu theo thanh ghi; không đánh dấu thành công khi Windows chỉ báo đã gửi. Mỗi tham số phải được đọc lại từ BMS hai lần trùng khớp.</div>
  </div>
+</section>
+<section id="device-admin" class="view">
+  <div class="panel">
+    <div class="row-title"><div><h3>Thông tin thiết bị và bảo mật</h3><p class="section-subtitle">Quản lý tên hiển thị trên PC và thông tin xác thực của JK BMS</p></div><span class="soft-chip" id="device-admin-status">Chờ BLE</span></div>
+    <div class="device-admin-summary">
+      <div class="mini-kpi"><span>TÊN THẬT BMS</span><strong id="device-native-name" class="device-kpi-text">--</strong><small>Đọc trực tiếp từ Device Info 0x03</small></div>
+      <div class="mini-kpi"><span>MODEL / FIRMWARE</span><strong id="device-native-model" class="device-kpi-text">--</strong><small id="device-native-firmware">Chưa nhận thông tin</small></div>
+      <div class="mini-kpi"><span>SỐ SERIAL</span><strong id="device-native-serial" class="device-kpi-text">--</strong><small>Thông tin dùng khi liên hệ hỗ trợ</small></div>
+    </div>
+    <div class="device-admin-grid">
+      <div class="device-admin-card">
+        <h4>Đặt tên trên máy tính</h4>
+        <p>Đổi tên hiển thị trong JK BMS Studio để phân biệt các bộ pin. Không thay đổi tên quảng bá BLE trên BMS.</p>
+        <label for="device-local-name">Tên hiển thị trong ứng dụng PC</label>
+        <div class="device-inline-form">
+          <input id="device-local-name" type="text" maxlength="32" placeholder="Ví dụ: PIN_SOLAR_8S" autocomplete="off">
+          <button id="device-local-save" class="action primary" disabled>Lưu tên PC</button>
+          <button id="device-local-reset" class="action" disabled>Xóa tên PC</button>
+        </div>
+        <small id="device-local-feedback" class="device-hint">Chọn một thiết bị BLE để đặt tên.</small>
+      </div>
+      <div class="device-admin-card">
+        <h4>Đổi tên trực tiếp trên BMS</h4>
+        <p>Ứng dụng JK trên điện thoại cho phép thay đổi tên BLE. Firmware có bộ lệnh ghi riêng, chưa được xác nhận trên PC.</p>
+        <div class="device-info-note">Hiện tại phần mềm <strong>không gửi lệnh đổi tên thật</strong> để tránh ghi sai vào vùng Device Info. Trong ứng dụng JK điện thoại: chọn thiết bị → biểu tượng bút → đổi tên → OK.</div>
+      </div>
+      <div class="device-admin-card">
+        <h4>Đổi mật khẩu thiết bị</h4>
+        <p>Theo hướng dẫn JK, đổi mật khẩu kết nối cần nhập mật khẩu hiện tại rồi xác nhận mật khẩu mới hai lần.</p>
+        <div class="device-info-note">Không lưu hoặc hiển thị mật khẩu từ khung BLE. Hãy dùng chức năng đổi mật khẩu chính thức trong app JK cho đến khi xác minh được opcode ghi trên firmware này.</div>
+      </div>
+      <div class="device-admin-card">
+        <h4>Quên mật khẩu / Khôi phục truy cập</h4>
+        <p>Không chạy lệnh “unlock” hoặc reset toàn bộ cấu hình BMS. Nhà cung cấp JK có hướng dẫn sử dụng serial để yêu cầu mật khẩu tạm thời.</p>
+        <a class="device-guide-link" href="https://jkbms-ess.com/de/blogs/news/how-to-modify-your-app-password" target="_blank" rel="noopener noreferrer">Hướng dẫn lấy lại mật khẩu chính thức ↗</a>
+        <a class="device-guide-link secondary" href="https://jkbms-ess.com/pages/support" target="_blank" rel="noopener noreferrer">Hỗ trợ sau bán hàng ↗</a>
+      </div>
+    </div>
+  </div>
 </section>
 <section id="diagnostics" class="view">
   <div class="panel">
@@ -321,7 +404,36 @@ function renderCells(cells) {
   $('cell-bars').replaceChildren(bars);
   $('cells-preview').replaceChildren(preview);
 }
+function clearTemperatures(){
+  for(const id of ['overview-temp1','overview-temp2','overview-temp-mos','overview-temp3','overview-temp4','overview-temp5']){
+    setText(id,'-- °C');
+    $(id).closest('.temperature-card')?.classList.remove('hot');
+  }
+  $('extra-temperatures').hidden=true;
+  setText('temperature-update-state','Chưa có dữ liệu');
+}
+function updateTemperatures(t){
+  const fields=[
+    ['overview-temp1','temperature1'],
+    ['overview-temp2','temperature2'],
+    ['overview-temp-mos','mosTemperature'],
+    ['overview-temp3','temperature3'],
+    ['overview-temp4','temperature4'],
+    ['overview-temp5','temperature5']
+  ];
+  let found=0,extra=false;
+  for(const [id,key] of fields){
+    const value=t[key];
+    const valid=typeof value==='number'&&Number.isFinite(value)&&value>=-55&&value<=145;
+    setText(id,valid?value.toFixed(1)+' °C':'-- °C');
+    $(id).closest('.temperature-card')?.classList.toggle('hot',valid&&value>=60);
+    if(valid){found++;if(['temperature3','temperature4','temperature5'].includes(key))extra=true;}
+  }
+  $('extra-temperatures').hidden=!extra;
+  setText('temperature-update-state',found?found+' cảm biến đang đọc':'Chưa có dữ liệu cảm biến');
+}
 function resetMeasurements() {
+  clearTemperatures();
   metric('pack-voltage',null,'V',2);metric('pack-current',null,'A',2);
   metric('pack-power',null,'W',0);metric('pack-soc',null,'%',0);
   ['charge-state','discharge-state','balance-state'].forEach(id => setOverviewState(id,null));
@@ -336,6 +448,7 @@ function handleTelemetry(t) {
   if (!Array.isArray(t.cells)) return;
   const cells = t.cells.filter(v=>typeof v==='number'&&Number.isFinite(v)&&v>0&&v<6);
   renderCells(cells);
+  updateTemperatures(t);
   const canReadPack = t.packVerified === true;
   metric('pack-voltage',canReadPack?t.voltage:null,'V',2);
   metric('pack-current',canReadPack?t.current:null,'A',2);
@@ -449,4 +562,4 @@ if(window.chrome && window.chrome.webview){
 }else{
   note('Đang xem giao diện HTML. Chức năng BLE chỉ hoạt động trong JK BMS Studio.');
 }
-</script><script src="settings.js"></script></body></html>
+</script><script src="settings.js"></script><script src="device.js"></script></body></html>
