@@ -72,10 +72,19 @@ inline std::optional<Telemetry> decodeJk02(std::vector<uint8_t> const& f,Protoco
  t.temperature2=temperature(132+off);
  t.mosTemperature=temperature(p==Protocol::JK02_32S?112+2*off:134);
  if(p==Protocol::JK02_32S){
-  t.temperature3=temperature(226+off);
-  t.temperature4=temperature(224+off);
-  t.temperature5=temperature(222+off);
+  // Additional probes only exist on selected JK02_32S boards.
+  if(u16(f,226+off)!=0)t.temperature3=temperature(226+off);
+  if(u16(f,224+off)!=0)t.temperature4=temperature(224+off);
+  if(u16(f,222+off)!=0)t.temperature5=temperature(222+off);
  }
+ // Temperature sensor absent flags (bit0 MOS, bits1..5 T1..T5).
+ uint16_t absent=u16(f,182+off);
+ if(absent&(1u<<0))t.mosTemperature.reset();
+ if(absent&(1u<<1))t.temperature1.reset();
+ if(absent&(1u<<2))t.temperature2.reset();
+ if(absent&(1u<<3))t.temperature3.reset();
+ if(absent&(1u<<4))t.temperature4.reset();
+ if(absent&(1u<<5))t.temperature5.reset();
  t.alarms=p==Protocol::JK02_32S?u32(f,134+off):u16(f,136+off);
  if(t.voltage<5.0||t.voltage>200.0||std::abs(t.current)>3000||t.soc>100)return {};
  if(std::abs(t.voltage-sum)>std::max(1.2,sum*0.08))return {};
