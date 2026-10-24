@@ -1,4 +1,7 @@
 #include "../src/jk_protocol.h"
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <cmath>
 #include <cstring>
