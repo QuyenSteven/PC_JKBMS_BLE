@@ -67,7 +67,7 @@ ULONGLONG lastStatusRequestMs=0,connectedAtMs=0;
 std::mutex settingsMutex;
 std::vector<uint8_t> latestSettings;
 ULONGLONG lastSettingsMs=0;
-std::wstring activeModel,activeHardware,activeSoftware;
+std::wstring activeModel,activeHardware,activeSoftware,activeSerial,activeMac;
 std::atomic<jk::Protocol> observedProtocol{jk::Protocol::Auto};
 struct PendingWrite{
  std::string key;double value=0;
@@ -122,10 +122,10 @@ std::wstring parseAscii(std::vector<uint8_t> const& b,size_t offset,size_t len){
  return out;
 }
 void emitSettings(){
- std::vector<uint8_t> frame;std::wstring model,software;
+ std::vector<uint8_t> frame;std::wstring model,software,serial,mac;
  {
   std::lock_guard lock(settingsMutex);
-  frame=latestSettings;model=activeModel;software=activeSoftware;
+  frame=latestSettings;model=activeModel;software=activeSoftware;serial=activeSerial;mac=activeMac;
  }
  auto p=effectiveProtocol();
  if(frame.size()!=300||p==jk::Protocol::Auto)return;
@@ -133,6 +133,8 @@ void emitSettings(){
  stream<<L"{\"type\":\"settings\",\"protocol\":\""<<jk::name(p)
        <<L"\",\"model\":\""<<jsonEscape(model)
        <<L"\",\"firmware\":\""<<jsonEscape(software)
+       <<L"\",\"serial\":\""<<jsonEscape(serial)
+       <<L"\",\"mac\":\""<<jsonEscape(mac)
        <<L"\",\"ready\":"<<((observedProtocol.load()==p && !model.empty())?L"true":L"false")
        <<L",\"fields\":[";
  bool first=true;
@@ -165,7 +167,7 @@ void disconnectBms(){
   std::lock_guard lock(settingsMutex);
   if(pendingWrite)settingStatus(pendingWrite->key,L"failed",L"Ngắt BLE trước khi xác minh ghi.");
   pendingWrite.reset();latestSettings.clear();lastSettingsMs=0;
-  activeModel.clear();activeHardware.clear();activeSoftware.clear();
+  activeModel.clear();activeHardware.clear();activeSoftware.clear();activeSerial.clear();activeMac.clear();
  }
  observedProtocol=jk::Protocol::Auto;
  emit(L"{\"type\":\"settingsClear\"}");
@@ -206,8 +208,9 @@ void parseFrame(std::vector<uint8_t> const& b){
    activeModel=parseAscii(b,6,16);
    activeHardware=parseAscii(b,22,8);
    activeSoftware=parseAscii(b,30,8);
+   activeSerial=parseAscii(b,86,11);
   }
-  emit(L"{\"type\":\"deviceInfo\",\"model\":\""+jsonEscape(parseAscii(b,6,16))+
+  emit(L"{\"type\":\"deviceInfo\",\"serial\":\""+jsonEscape(parseAscii(b,86,11))+L"\",\"model\":\""+jsonEscape(parseAscii(b,6,16))+
        L"\",\"hardware\":\""+jsonEscape(parseAscii(b,22,8))+
        L"\",\"firmware\":\""+jsonEscape(parseAscii(b,30,8))+L"\"}");
   emitSettings();
@@ -285,7 +288,9 @@ void sendRead(uint8_t command){
  log(L"TX 0x"+std::wstring(cmd)+L" result "+std::to_wstring(static_cast<int>(result)));
 }
 void connectBms(uint64_t address){
- disconnectBms();status=L"connecting";field(L"status",status);
+ disconnectBms();
+ {std::lock_guard lock(settingsMutex);activeMac=hex(address);}
+ status=L"connecting";field(L"status",status);
  log(L"Connecting to "+hex(address));
  auto target=BluetoothLEDevice::FromBluetoothAddressAsync(address).get();
  if(!target)throw std::runtime_error("BluetoothLEDevice not found");
