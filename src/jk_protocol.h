@@ -69,7 +69,7 @@ inline std::optional<Telemetry> decodeJk02(std::vector<uint8_t> const& f,Protoco
   if(location+1>=f.size())return {};
   const uint16_t raw=u16(f,location);
   if(raw==0xFFFFu||raw==0x7FFFu)return {};
-  if(raw==0 && (absent & (uint16_t(1)<<absentBit)))return {};
+  if(raw==0 && (absentBit>=3 || (absent & (uint16_t(1)<<absentBit))))return {};
   const double value=static_cast<int16_t>(raw)*0.1;
   if(!std::isfinite(value)||value < -55.0||value > 145.0)return {};
   return value;
