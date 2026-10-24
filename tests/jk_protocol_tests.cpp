@@ -1,4 +1,5 @@
 #include "../src/jk_protocol.h"
+#include "../src/jk_settings.h"
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -46,5 +47,48 @@ int main(){
  crc(old);
  auto t=jk::decode(old,jk::Protocol::Auto);
  assert(t&&t->protocol==jk::Protocol::JK04&&t->cells.size()==8&&!t->packVerified);
+ // Settings reference mappings (JK02_24S + JK02_32S share the first 142 offsets).
+ std::vector<uint8_t> settings(300);
+ settings[0]=0x55;settings[1]=0xAA;settings[2]=0xEB;settings[3]=0x90;settings[4]=1;
+ put32(settings,10,2900);put32(settings,14,3200);put32(settings,18,3650);put32(settings,22,3550);
+ put32(settings,26,10);put32(settings,50,30000);put32(settings,62,50000);
+ put32(settings,82,600);put32(settings,86,550);
+ put32(settings,98,static_cast<uint32_t>(int32_t(-200)));
+ put32(settings,102,static_cast<uint32_t>(int32_t(-100)));
+ put32(settings,118,1);put32(settings,122,1);put32(settings,126,1);
+ put32(settings,138,3400);crc(settings);
+ assert(jk::settings().size()>=30);
+ auto uvp=jk::findSetting("cell_uvp"),ovp=jk::findSetting("cell_ovp"),balance=jk::findSetting("balance_start");
+ assert(uvp&&ovp&&balance);
+ for(auto p:{jk::Protocol::JK02_24S,jk::Protocol::JK02_32S}){
+  auto v=jk::readSetting(settings,*uvp,p);
+  assert(v&&std::abs(*v-2.9)<0.001);
+  auto cmd=jk::settingWriteFrame(*uvp,p,2.95);
+  assert(cmd[0]==0xAA&&cmd[4]==0x02&&cmd[5]==4);
+  uint8_t crc8=0;for(int i=0;i<19;i++)crc8=uint8_t(crc8+cmd[i]);assert(crc8==cmd[19]);
+  assert(uint32_t(cmd[6])+(uint32_t(cmd[7])<<8)==2950);
+  auto balanceCommand=jk::settingWriteFrame(*balance,p,3.4);
+  assert(balanceCommand[4]==(p==jk::Protocol::JK02_24S?0x26:0x22));
+  assert(!jk::crossCheck("cell_ovp",3.4,settings,p)); // < 3.55 OVPR
+  assert(!jk::crossCheck("cell_uvp",3.4,settings,p)); // > 3.2 UVPR
+  assert(jk::crossCheck("cell_uvp",2.95,settings,p));
+  assert(!jk::encodeValue(*uvp,p,0.5));
+  assert(jk::encodeValue(*uvp,p,2.95));
+  assert(jk::findSetting("charge_mos")&&jk::canWrite(*jk::findSetting("charge_mos"),p));
+ }
+ std::vector<uint8_t> settings04(300);
+ settings04[4]=1;put32(settings04,34,16);
+ auto putFloat=[&](size_t off,float v){uint32_t bits=0;std::memcpy(&bits,&v,4);put32(settings04,off,bits);};
+ putFloat(98,3.4f);putFloat(106,0.012f);putFloat(110,2.0f);put32(settings04,114,1);
+ auto balStart=jk::findSetting("balance_start");
+ assert(balStart&&jk::readSetting(settings04,*balStart,jk::Protocol::JK04));
+ auto j4v=jk::readSetting(settings04,*balStart,jk::Protocol::JK04);
+ assert(j4v&&std::abs(*j4v-3.4)<0.00001);
+ auto j4cmd=jk::settingWriteFrame(*balStart,jk::Protocol::JK04,3.45);
+ assert(j4cmd[4]==0x58&&j4cmd[5]==4);
+ assert(!jk::canWrite(*uvp,jk::Protocol::JK04));
+ auto reset=jk::request(0x66);
+ assert(reset[4]==0x66&&reset[5]==0);
+ std::cout<<"JK settings mapping, guarded writes, JK04 float, and restart frame tests: PASS\n";
  std::cout<<"JK protocol frame assembler and 24S/32S/JK04 decoder tests: PASS\n";
 }
