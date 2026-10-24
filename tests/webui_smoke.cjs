@@ -26,6 +26,7 @@ class FakeElement{
 }
 const elements=new Map(),messages=[],navigation=[new FakeElement('nav-overview'),new FakeElement('nav-cells')],views=[new FakeElement('overview'),new FakeElement('cells')];
 const element=id=>{if(!elements.has(id))elements.set(id,new FakeElement(id));return elements.get(id);};
+element('side-dot').parentElement=new FakeElement('sidebar-connection');
 for(const nav of navigation)nav.dataset={page:nav.id.slice(4)};
 const document={
  getElementById:element,
