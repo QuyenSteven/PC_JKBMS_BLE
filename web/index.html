@@ -104,7 +104,7 @@
 
 .temperature-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 2px 12px;color:#9cbbd1;font-size:11px;font-weight:750;letter-spacing:1.1px}
 .temperature-heading small{color:#87a6bd;font-size:11px;letter-spacing:0;font-weight:500}
-.temperature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.temperature-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
 .temperature-extra{margin-top:9px}
 .temperature-grid[hidden]{display:none}
 .temperature-card{display:flex;gap:10px;align-items:center;background:#101b2b;border:1px solid #273b4d;border-radius:12px;padding:12px 10px;min-width:0;min-height:80px}
@@ -112,8 +112,8 @@
 .temperature-icon.mos{color:#ffd29a;background:#46382f;font-size:10px}
 .temperature-info{min-width:0}.temperature-info span{display:block;color:#93afc3;font-size:11px}.temperature-info strong{display:block;color:#f1f7fc;font-size:22px;letter-spacing:-.3px;margin-top:6px;white-space:nowrap}
 .temperature-card.hot{border-color:#985d4e;background:#332733}.temperature-card.hot strong{color:#ffb19c}
-@media(max-width:1150px){.temperature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:660px){.temperature-grid{grid-template-columns:1fr}}
+@media(max-width:1450px){.temperature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:660px){.temperature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .device-admin-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:21px 0}
 .device-kpi-text{font-size:18px!important;letter-spacing:0!important;white-space:normal!important;overflow-wrap:anywhere}
@@ -154,11 +154,11 @@
 <div class="temperature-grid">
   <div class="temperature-card"><div class="temperature-icon">T1</div><div class="temperature-info"><span>Cảm biến nhiệt T1</span><strong id="overview-temp1">-- °C</strong></div></div>
   <div class="temperature-card"><div class="temperature-icon">T2</div><div class="temperature-info"><span>Cảm biến nhiệt T2</span><strong id="overview-temp2">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T3</div><div class="temperature-info"><span>Cảm biến nhiệt T3</span><strong id="overview-temp3">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T4</div><div class="temperature-info"><span>Cảm biến nhiệt T4</span><strong id="overview-temp4">-- °C</strong></div></div>
   <div class="temperature-card"><div class="temperature-icon mos">MOS</div><div class="temperature-info"><span>Nhiệt độ MOSFET</span><strong id="overview-temp-mos">-- °C</strong></div></div>
 </div>
 <div id="extra-temperatures" class="temperature-grid temperature-extra" hidden>
-  <div class="temperature-card"><div class="temperature-icon">T3</div><div class="temperature-info"><span>Cảm biến nhiệt T3</span><strong id="overview-temp3">-- °C</strong></div></div>
-  <div class="temperature-card"><div class="temperature-icon">T4</div><div class="temperature-info"><span>Cảm biến nhiệt T4</span><strong id="overview-temp4">-- °C</strong></div></div>
   <div class="temperature-card"><div class="temperature-icon">T5</div><div class="temperature-info"><span>Cảm biến nhiệt T5</span><strong id="overview-temp5">-- °C</strong></div></div>
 </div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
 </section>
@@ -421,15 +421,15 @@ function updateTemperatures(t){
     ['overview-temp4','temperature4'],
     ['overview-temp5','temperature5']
   ];
-  let found=0,extra=false;
+  let found=0,t5Available=false;
   for(const [id,key] of fields){
     const value=t[key];
     const valid=typeof value==='number'&&Number.isFinite(value)&&value>=-55&&value<=145;
     setText(id,valid?value.toFixed(1)+' °C':'-- °C');
     $(id).closest('.temperature-card')?.classList.toggle('hot',valid&&value>=60);
-    if(valid){found++;if(['temperature3','temperature4','temperature5'].includes(key))extra=true;}
+    if(valid){found++;if(key==='temperature5')t5Available=true;}
   }
-  $('extra-temperatures').hidden=!extra;
+  $('extra-temperatures').hidden=!t5Available;
   setText('temperature-update-state',found?found+' cảm biến đang đọc':'Chưa có dữ liệu cảm biến');
 }
 function resetMeasurements() {
