@@ -37,6 +37,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Settings JavaScript syntax check failed" }
           node tests/settings_ui_smoke.cjs
           if ($LASTEXITCODE -ne 0) { throw "Settings editor and guarded write tests failed" }
+          node --check web/device.js
+          if ($LASTEXITCODE -ne 0) { throw "Device management JS syntax check failed" }
+          node tests/device_ui_smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Device management tests failed" }
       - uses: actions/upload-artifact@v4
         with:
           name: JK-BMS-PC-Windows-x64
@@ -44,4 +48,5 @@ jobs:
             x64/Release/*.exe
             x64/Release/web/index.html
             x64/Release/web/settings.js
+            x64/Release/web/device.js
           if-no-files-found: error
