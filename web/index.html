@@ -73,6 +73,34 @@
 @media(max-width:1260px){.cell-kpis{grid-template-columns:repeat(3,1fr)}.control-grid{grid-template-columns:1fr}}
 @media(max-width:950px){.cell-kpis{grid-template-columns:repeat(2,1fr)}.diagnostic-grid{grid-template-columns:repeat(2,1fr)}.protection-overview{grid-template-columns:1fr}.cell-grid-page{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
 @media(max-width:700px){.cell-kpis,.diagnostic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cell-grid-page{grid-template-columns:repeat(2,minmax(0,1fr))}.control-card{flex-wrap:wrap}.info-list div{flex-direction:column;gap:5px}.chart-guide{flex-wrap:wrap}}
+
+/* JK BLE configuration and command panel */
+.config-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:4px 0 14px}
+.config-toolbar .action{font-size:13px}
+.config-toolbar .action.primary{margin-left:auto}
+.config-description{font-size:12px;color:#a5bfd4;background:#122338;border:1px solid #29425a;border-radius:11px;padding:13px 15px;line-height:1.55;margin:0 0 12px}
+.model-kpi{font-size:18px!important;overflow:hidden;text-overflow:ellipsis}
+.config-table{min-width:780px}
+.config-table th:nth-child(3),.config-table td:nth-child(3){font-variant-numeric:tabular-nums}
+.config-table tr.config-dirty{background:#19383b}
+.config-table tr.config-pending{background:#243b53}
+.config-table tr.config-failed{background:#47303a}
+.config-table tr.config-verified{background:#153a35}
+.config-input{background:#101c2b;border:1px solid #3b5872;border-radius:8px;color:#e8f7ff;font:inherit;font-weight:650;padding:9px 10px;width:150px;max-width:100%;outline:none}
+.config-input:focus{border-color:#20caa8;box-shadow:0 0 0 2px #1fcaa91a}
+.config-input:disabled{opacity:.55;border-color:#22394c}
+.config-waiting{padding:48px 20px!important;text-align:center;color:#91acc3!important}
+.config-state{font-size:11px;font-weight:650;color:#a1b7c9;white-space:nowrap}
+.config-state.edited{color:#67e7c5}
+.config-state.pending{color:#ffd286}
+.config-state.failed{color:#ffaea9}
+.config-state.verified{color:#6be8c4}
+.settings-guard{border-top:1px solid #2b4054;padding:17px 2px 0;margin-top:12px;font-size:12px;color:#9aafc3;line-height:1.7}
+.settings-guard strong{color:#b9cfdf}
+.control-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+.control-toggle{font-size:12px!important;padding:9px 12px!important;min-width:110px}
+.control-toggle:disabled{cursor:not-allowed;opacity:.4}
+@media(max-width:860px){.config-toolbar .action.primary{margin-left:0}.control-actions{margin-left:auto}}
 </style></head>
 <body><div class="shell">
 <aside><div class="brand"><div class="symbol">JK</div><div><strong>JK BMS</strong><small>DESKTOP STUDIO</small></div></div>
@@ -114,41 +142,43 @@
   <div class="panel">
     <div class="row-title"><div><h3>Điều khiển và trạng thái BMS</h3><p class="section-subtitle">Trạng thái đọc trực tiếp từ thiết bị; lệnh ghi chỉ mở sau khi xác minh theo model và firmware</p></div><span id="control-status" class="soft-chip">Chế độ giám sát</span></div>
     <div class="control-grid">
-      <div class="control-card"><div class="control-icon charge-icon">↥</div><div class="control-info"><h4>Charge MOS</h4><p>Đường MOSFET sạc pin</p></div><span id="ctrl-charge" class="state-pill neutral">--</span></div>
-      <div class="control-card"><div class="control-icon discharge-icon">↧</div><div class="control-info"><h4>Discharge MOS</h4><p>Đường MOSFET xả pin</p></div><span id="ctrl-discharge" class="state-pill neutral">--</span></div>
-      <div class="control-card"><div class="control-icon balance-icon">⇌</div><div class="control-info"><h4>Cân bằng cell</h4><p>Active balancing</p></div><span id="ctrl-balance" class="state-pill neutral">--</span></div>
-      <div class="control-card"><div class="control-icon reboot-icon">↻</div><div class="control-info"><h4>Reboot BMS</h4><p>Khởi động lại bộ điều khiển</p></div><button id="btn-reboot" class="action disabled-action" disabled title="Chưa xác minh mã lệnh reboot cho thiết bị này">Chưa hỗ trợ</button></div>
+      <div class="control-card"><div class="control-icon charge-icon">↥</div><div class="control-info"><h4>Charge MOS</h4><p>Đường MOSFET sạc pin</p></div><div class="control-actions"><span id="ctrl-charge" class="state-pill neutral">--</span><button id="ctrl-charge-toggle" class="action control-toggle" disabled>Đổi trạng thái</button></div></div>
+      <div class="control-card"><div class="control-icon discharge-icon">↧</div><div class="control-info"><h4>Discharge MOS</h4><p>Đường MOSFET xả pin</p></div><div class="control-actions"><span id="ctrl-discharge" class="state-pill neutral">--</span><button id="ctrl-discharge-toggle" class="action control-toggle" disabled>Đổi trạng thái</button></div></div>
+      <div class="control-card"><div class="control-icon balance-icon">⇌</div><div class="control-info"><h4>Cân bằng cell</h4><p>Active balancing</p></div><div class="control-actions"><span id="ctrl-balance" class="state-pill neutral">--</span><button id="ctrl-balance-toggle" class="action control-toggle" disabled>Đổi trạng thái</button></div></div>
+      <div class="control-card"><div class="control-icon reboot-icon">↻</div><div class="control-info"><h4>Reboot BMS</h4><p>Khởi động lại bộ điều khiển</p></div><button id="btn-reboot" class="action control-toggle" disabled title="Yêu cầu xác nhận REBOOT trước khi gửi lệnh 0x66">Khởi động lại</button></div>
     </div>
   </div>
   <div class="panel info-panel"><div class="row-title"><h3>Thông tin điều khiển</h3><span>Đọc / ghi</span></div>
     <div class="info-list">
       <div><span>Thiết bị hiện tại</span><strong id="ctrl-device-name">Chưa kết nối</strong></div>
       <div><span>Giao thức nhận dạng</span><strong id="ctrl-device-protocol">--</strong></div>
-      <div><span>Quyền thay đổi thông số</span><strong>Chưa hỗ trợ trên firmware hiện tại của PC Studio</strong></div>
+      <div><span>Quyền thay đổi thông số</span><strong id="ctrl-write-access">Chờ đọc cấu hình và xác minh phiên bản</strong></div>
     </div>
   </div>
 </section>
 <section id="protection" class="view">
-  <div class="panel">
-    <div class="row-title"><div><h3>Cấu hình bảo vệ</h3><p class="section-subtitle">Nhóm tham số điện áp, dòng điện, nhiệt độ và cân bằng của JK BMS</p></div><span id="protection-status" class="soft-chip">Chưa nhận cấu hình</span></div>
-    <div class="protection-overview">
-      <div class="mini-kpi"><span>KHUNG CẤU HÌNH</span><strong id="settings-frame-state">--</strong><small id="settings-frame-detail">Chờ phản hồi BLE 0x01</small></div>
-      <div class="mini-kpi"><span>CHẾ ĐỘ</span><strong>Chỉ đọc</strong><small>Không gửi lệnh ghi BMS</small></div>
-      <div class="mini-kpi"><span>SAO LƯU THÔ</span><strong>RAW BLE</strong><small>Chọn “Xuất dữ liệu” để lưu khung gốc</small></div>
-    </div>
-    <div class="protection-table-wrap"><table class="protection-table"><thead><tr><th>Nhóm</th><th>Thông số</th><th>Giá trị BMS</th><th>Đơn vị</th><th>Tình trạng giải mã</th></tr></thead>
-      <tbody id="protection-body">
-        <tr><td>Điện áp</td><td>Cell Over Voltage Protection (OVP)</td><td>--</td><td>V</td><td>Chưa xác minh offset</td></tr>
-        <tr><td>Điện áp</td><td>Cell Under Voltage Protection (UVP)</td><td>--</td><td>V</td><td>Chưa xác minh offset</td></tr>
-        <tr><td>Dòng điện</td><td>Charge Over Current Protection</td><td>--</td><td>A</td><td>Chưa xác minh offset</td></tr>
-        <tr><td>Dòng điện</td><td>Discharge Over Current Protection</td><td>--</td><td>A</td><td>Chưa xác minh offset</td></tr>
-        <tr><td>Nhiệt độ</td><td>Charge / Discharge Over Temperature</td><td>--</td><td>°C</td><td>Chưa xác minh offset</td></tr>
-        <tr><td>Nhiệt độ</td><td>Low Temperature Protection</td><td>--</td><td>°C</td><td>Chưa xác minh offset</td></tr>
-        <tr><td>Cân bằng</td><td>Start Voltage / Trigger Delta</td><td>--</td><td>V / mV</td><td>Chưa xác minh offset</td></tr>
-        <tr><td>Khác</td><td>Protection Release / Recovery Delay</td><td>--</td><td>s</td><td>Chưa xác minh offset</td></tr>
-      </tbody></table></div>
-    <p class="subtle-note">Khung Settings có thể đã nhận, nhưng giá trị bảo vệ chỉ được hiển thị khi xác nhận đúng bảng thanh ghi của model. Không dùng các giá trị suy đoán để cấu hình pin.</p>
+ <div class="panel">
+  <div class="row-title"><div><h3>Cấu hình bảo vệ và thông số BMS</h3><p class="section-subtitle">Đọc từ khung Settings 0x01 · từng thay đổi sẽ được xác minh lại từ BMS</p></div><span id="protection-status" class="soft-chip">Chờ đọc cấu hình</span></div>
+  <div class="protection-overview">
+    <div class="mini-kpi"><span>MODEL / FIRMWARE</span><strong id="settings-model" class="model-kpi">--</strong><small id="settings-software">Chưa có thông tin thiết bị</small></div>
+    <div class="mini-kpi"><span>CẤU HÌNH ĐANG ĐỌC</span><strong id="settings-frame-state">--</strong><small id="settings-frame-detail">Chờ BLE Settings 0x01</small></div>
+    <div class="mini-kpi"><span>THAY ĐỔI CHƯA GHI</span><strong id="settings-dirty-count">0</strong><small id="settings-write-state">Chưa có chỉnh sửa</small></div>
   </div>
+  <div class="config-toolbar">
+    <button class="action" id="settings-refresh">Đọc lại BMS</button>
+    <button class="action" id="settings-backup" disabled>Sao lưu JSON</button>
+    <button class="action" id="settings-import">Khôi phục từ JSON</button>
+    <input id="settings-file" type="file" accept=".json,application/json" hidden>
+    <button class="action" id="settings-revert" disabled>Bỏ thay đổi</button>
+    <button class="action primary" id="settings-apply" disabled>Ghi thay đổi (0)</button>
+  </div>
+  <p class="config-description" id="config-operation">Chọn thiết bị và nhận thông số trước khi chỉnh sửa. Các trường không hỗ trợ vẫn chỉ đọc.</p>
+  <div class="protection-table-wrap"><table class="protection-table config-table">
+    <thead><tr><th>Nhóm</th><th>Thông số</th><th>Hiện tại</th><th>Điều chỉnh</th><th>Đơn vị</th><th>Trạng thái</th></tr></thead>
+    <tbody id="protection-body"><tr><td colspan="6" class="config-waiting">Chưa nhận bảng cấu hình Settings từ BMS.</td></tr></tbody>
+  </table></div>
+  <div class="settings-guard"><strong>Kiểm soát ghi:</strong> xác nhận từng đợt thay đổi, giới hạn dữ liệu theo thanh ghi; không đánh dấu thành công khi Windows chỉ báo đã gửi. Mỗi tham số phải được đọc lại từ BMS hai lần trùng khớp.</div>
+ </div>
 </section>
 <section id="diagnostics" class="view">
   <div class="panel">
@@ -419,4 +449,4 @@ if(window.chrome && window.chrome.webview){
 }else{
   note('Đang xem giao diện HTML. Chức năng BLE chỉ hoạt động trong JK BMS Studio.');
 }
-</script></body></html>
+</script><script src="settings.js"></script></body></html>
