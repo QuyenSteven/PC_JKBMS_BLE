@@ -165,77 +165,258 @@
 
 </main></div><script>
 'use strict';
-const $=id=>document.getElementById(id);
-const buttons=document.querySelectorAll('[data-page]');
-buttons.forEach(b=>b.addEventListener('click',()=>{
- buttons.forEach(n=>n.classList.toggle('active',n===b));
- document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===b.dataset.page));
+const $ = (id) => document.getElementById(id);
+const devices = new Map();
+const counters = {settings:0,telemetry:0,info:0};
+let connected = false;
+let selectedProtocol = 'AUTO';
+
+function send(command) {
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.postMessage(command);
+  } else {
+    note('WebView2 chưa sẵn sàng; mở qua JK BMS Studio để kết nối BLE.');
+  }
+}
+function note(message) {
+  const output = $('ble-log');
+  output.value += (output.value ? '\n' : '') + new Date().toLocaleTimeString('vi-VN') + '  ' + message;
+  if (output.value.length > 90000) output.value = output.value.slice(-75000);
+  output.scrollTop = output.scrollHeight;
+}
+function setText(id, value) {
+  const el = $(id);
+  if (el) el.textContent = String(value);
+}
+function metric(id, value, unit, digits) {
+  const el = $(id);
+  if (!el) return;
+  el.replaceChildren();
+  const number = document.createTextNode(Number.isFinite(value) ? value.toFixed(digits) : '--');
+  const label = document.createElement('span');
+  label.className = 'unit';
+  label.textContent = ' ' + unit;
+  el.append(number, label);
+}
+function state(id, enabled) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.remove('on','off','neutral');
+  if (enabled !== true && enabled !== false) {
+    el.classList.add('neutral');
+    el.textContent = '--';
+  } else {
+    el.classList.add(enabled ? 'on' : 'off');
+    el.textContent = enabled ? 'BẬT' : 'TẮT';
+  }
+}
+function mosValue(v) { return v === 1 ? true : v === 0 ? false : null; }
+function setOverviewState(id, v) {
+  const el = $(id);
+  const enabled = mosValue(v);
+  el.textContent = enabled === null ? 'Chưa biết' : enabled ? 'BẬT' : 'TẮT';
+  el.style.color = enabled === null ? '' : enabled ? '#65e7c6' : '#ffb39b';
+}
+function resetCells() {
+  const empty = document.createElement('div');
+  empty.className = 'empty-state';
+  empty.textContent = 'Kết nối JK BMS để xem điện áp từng cell.';
+  $('cell-grid-page').replaceChildren(empty);
+  const chartEmpty = document.createElement('div');
+  chartEmpty.className = 'empty-state';
+  chartEmpty.textContent = 'Biểu đồ sẽ hiển thị khi nhận được telemetry.';
+  $('cell-bars').replaceChildren(chartEmpty);
+  $('cells-preview').replaceChildren();
+  [['cells-count','--'],['cells-min','-- V'],['cells-max','-- V'],['cells-delta','-- mV'],['cells-avg','-- V'],
+   ['cells-min-index','Chưa có dữ liệu'],['cells-max-index','Chưa có dữ liệu'],
+   ['min-cell','-- V'],['max-cell','-- V'],['delta-cell','-- mV'],
+   ['cells-title-status','Đang chờ dữ liệu'],['cells-grid-status','Chưa có dữ liệu'],
+   ['cell-bar-caption','Chưa có dữ liệu'],['overview-cell-status','Chưa có dữ liệu']].forEach(([k,v]) => setText(k,v));
+}
+function renderCells(cells) {
+  if (!Array.isArray(cells) || !cells.length) {
+    resetCells();
+    return;
+  }
+  const data = cells.filter(v => typeof v === 'number' && Number.isFinite(v) && v > 0 && v < 6);
+  if (!data.length) { resetCells(); return; }
+  const min = Math.min(...data), max = Math.max(...data);
+  const avg = data.reduce((a,b)=>a+b,0)/data.length;
+  const deltaMv = (max - min) * 1000;
+  const firstMin = data.findIndex(v=>v===min),firstMax = data.findIndex(v=>v===max);
+  const voltage = v => v.toFixed(3) + ' V';
+  setText('cells-count',data.length);
+  setText('cells-min',voltage(min));setText('cells-max',voltage(max));
+  setText('cells-delta',deltaMv.toFixed(0)+' mV');setText('cells-avg',voltage(avg));
+  setText('cells-min-index','Cell '+String(firstMin+1).padStart(2,'0'));
+  setText('cells-max-index','Cell '+String(firstMax+1).padStart(2,'0'));
+  setText('cells-title-status',data.length+' cell hoạt động');
+  setText('cells-grid-status','Dữ liệu đang cập nhật');
+  setText('overview-cell-status',data.length+' cell hoạt động');
+  setText('cell-bar-caption','Min '+min.toFixed(3)+' V · Max '+max.toFixed(3)+' V · Δ '+deltaMv.toFixed(0)+' mV');
+  setText('min-cell',voltage(min));setText('max-cell',voltage(max));setText('delta-cell',deltaMv.toFixed(0)+' mV');
+
+  const cards = document.createDocumentFragment();
+  const bars = document.createDocumentFragment();
+  const preview = document.createDocumentFragment();
+  const range = Math.max(max-min,0.001);
+  data.forEach((v,i) => {
+    const id='Cell '+String(i+1).padStart(2,'0');
+    const type = i===firstMin?'is-low':i===firstMax?'is-high':'';
+    const offsetMv = (v-avg)*1000;
+    const offset = (offsetMv>=0?'+':'')+offsetMv.toFixed(1)+' mV so với TB';
+
+    const card=document.createElement('div');
+    card.className='cell-card '+type;
+    const cardIndex=document.createElement('div');cardIndex.className='cell-index';cardIndex.textContent=id.toUpperCase();
+    const cardValue=document.createElement('div');cardValue.className='cell-value';cardValue.textContent=v.toFixed(3)+' V';
+    const cardOffset=document.createElement('div');cardOffset.className='cell-offset';cardOffset.textContent=offset;
+    card.append(cardIndex,cardValue,cardOffset);cards.appendChild(card);
+
+    const bar=document.createElement('div');bar.className='cell-bar-item '+type;
+    const value=document.createElement('div');value.className='bar-voltage';value.textContent=v.toFixed(3)+' V';
+    const plot=document.createElement('div');plot.className='bar-plot';
+    const stick=document.createElement('div');stick.className='bar-stick';
+    stick.style.height=(19+(v-min)/range*157).toFixed(1)+'px';
+    plot.appendChild(stick);
+    const label=document.createElement('div');label.className='bar-label';label.textContent='C'+(i+1);
+    bar.append(value,plot,label);bars.appendChild(bar);
+
+    const tile=document.createElement('div');tile.className='cell';
+    const small=document.createElement('div');small.className='n';small.textContent='CELL '+String(i+1).padStart(2,'0');
+    const cellVoltage=document.createElement('div');cellVoltage.className='v';cellVoltage.textContent=v.toFixed(3)+' V';
+    tile.append(small,cellVoltage);preview.appendChild(tile);
+  });
+  $('cell-grid-page').replaceChildren(cards);
+  $('cell-bars').replaceChildren(bars);
+  $('cells-preview').replaceChildren(preview);
+}
+function resetMeasurements() {
+  metric('pack-voltage',null,'V',2);metric('pack-current',null,'A',2);
+  metric('pack-power',null,'W',0);metric('pack-soc',null,'%',0);
+  ['charge-state','discharge-state','balance-state'].forEach(id => setOverviewState(id,null));
+  ['ctrl-charge','ctrl-discharge','ctrl-balance'].forEach(id => state(id,null));
+  setText('alarm-state','Chưa giải mã');
+  setText('control-status','Chế độ giám sát');
+  setText('ctrl-device-protocol','--');
+  resetCells();
+}
+function handleTelemetry(t) {
+  if (selectedProtocol !== 'AUTO' && selectedProtocol !== t.protocol) return;
+  if (!Array.isArray(t.cells)) return;
+  const cells = t.cells.filter(v=>typeof v==='number'&&Number.isFinite(v)&&v>0&&v<6);
+  renderCells(cells);
+  const canReadPack = t.packVerified === true;
+  metric('pack-voltage',canReadPack?t.voltage:null,'V',2);
+  metric('pack-current',canReadPack?t.current:null,'A',2);
+  metric('pack-power',canReadPack?t.power:null,'W',0);
+  metric('pack-soc',canReadPack?t.soc:null,'%',0);
+  setText('device-detail','BLE · '+t.protocol+(canReadPack?' · Đang có telemetry':' · Đang đọc cell'));
+  setText('ctrl-device-protocol',t.protocol);
+  setText('control-status',canReadPack?'Đang nhận trạng thái':'Chỉ nhận điện áp cell');
+  for (const [overview,control,key] of [
+    ['charge-state','ctrl-charge','charge'],
+    ['discharge-state','ctrl-discharge','discharge'],
+    ['balance-state','ctrl-balance','balance']]) {
+    const value = canReadPack ? t[key] : null;
+    setOverviewState(overview,value);
+    state(control,mosValue(value));
+  }
+}
+function updateConnection(stateName) {
+  connected=stateName==='connected';
+  const connecting=stateName==='connecting';
+  $('connection-status').classList.toggle('online',connected);
+  $('connection-status').innerHTML='<b></b> '+(connected?'Đã kết nối':connecting?'Đang kết nối':'Chưa kết nối');
+  $('device-status').textContent=connected?'ONLINE':connecting?'CONNECTING':'OFFLINE';
+  $('device-status').classList.toggle('online',connected);
+  $('side-dot').parentElement.classList.toggle('online',connected);
+  setText('side-status',connected?'Đã kết nối':connecting?'Đang kết nối':'Chưa kết nối');
+  $('disconnect').disabled=!connected;
+  $('connect').disabled=connected||connecting;
+  if(!connected) {
+    resetMeasurements();
+    setText('protection-status','Chưa có kết nối');
+    setText('settings-frame-state','--');
+    setText('settings-frame-detail','Chờ phản hồi BLE 0x01');
+  }
+}
+function handleFrame(message) {
+  const match=/^0x(0[123])/.exec(message||'');
+  if (!match) {note('Khung nhận: '+message);return;}
+  const type=match[1];
+  if(type==='01'){
+    counters.settings++;
+    setText('frame-settings',counters.settings);
+    setText('settings-frame-state','Đã nhận');
+    setText('settings-frame-detail','Frame 0x01 · cấu hình dạng nhị phân');
+    setText('protection-status','Đã nhận Settings RAW · chưa giải mã');
+  }else if(type==='02'){
+    counters.telemetry++;
+    setText('frame-telemetry',counters.telemetry);
+  }else if(type==='03'){
+    counters.info++;setText('frame-info',counters.info);
+  }
+  setText('frame-last',new Date().toLocaleTimeString('vi-VN'));
+  if(type!=='02'||counters.telemetry===1||counters.telemetry%30===0) {
+    note('RX '+message);
+  }
+}
+function receive(event) {
+  let data=event.data;
+  if(typeof data==='string'){try{data=JSON.parse(data);}catch{return;}}
+  if(!data||typeof data!=='object')return;
+  switch(data.type){
+    case 'log':note(data.message||'');break;
+    case 'clearDevices':
+      devices.clear();$('device-list').innerHTML='<option value="">Chọn thiết bị BLE...</option>';break;
+    case 'device':{
+      if(devices.has(data.address))break;
+      devices.set(data.address,data);
+      const option=document.createElement('option');
+      option.value=data.address;option.textContent=data.name+' ['+data.mac+']';
+      $('device-list').appendChild(option);
+      break;
+    }
+    case 'status':updateConnection(data.message);break;
+    case 'frame':handleFrame(data.message);break;
+    case 'telemetry':handleTelemetry(data);break;
+  }
+}
+document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{
+  document.querySelectorAll('[data-page]').forEach(n=>n.classList.toggle('active',n===button));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===button.dataset.page));
 }));
-function send(cmd){if(window.chrome?.webview)window.chrome.webview.postMessage(cmd);else note('Ứng dụng WebView2 chưa kết nối; hãy mở từ chương trình C++.');}
-function note(message){const log=$('ble-log');log.value+=(log.value?'\n':'')+new Date().toLocaleTimeString()+'  '+message;log.scrollTop=log.scrollHeight;}
-const devices=new Map();
-$('protocol').addEventListener('change',()=>send('protocol:'+$('protocol').value));
+$('protocol').addEventListener('change',()=>{
+  selectedProtocol=$('protocol').value;send('protocol:'+selectedProtocol);
+  resetMeasurements();note('Chọn giao thức: '+selectedProtocol);
+});
 $('scan').addEventListener('click',()=>send('scan'));
+$('connect').addEventListener('click',()=>{
+  const address=$('device-list').value;
+  if(!address){note('Vui lòng chọn thiết bị BLE trước khi kết nối.');return;}
+  send('connect:'+address);
+});
 $('disconnect').addEventListener('click',()=>send('disconnect'));
 $('save').addEventListener('click',()=>send('save'));
-$('connect').addEventListener('click',()=>{
- const value=$('device-list').value;
- if(!value){note('Vui lòng chọn thiết bị trước khi kết nối.');return;}
- send('connect:'+value);
-});
 $('device-list').addEventListener('change',()=>{
- let id=$('device-list').value,d=devices.get(id);
- $('device-label').textContent=d?d.name:'Chưa chọn JK BMS';
- $('device-detail').textContent=d?'BLE '+d.mac:'Bluetooth • Đang chờ kết nối';
+  const found=devices.get($('device-list').value);
+  setText('device-label',found?found.name:'Chưa chọn JK BMS');
+  setText('ctrl-device-name',found?found.name:'Chưa chọn thiết bị');
+  setText('device-detail',found?'BLE '+found.mac:'Bluetooth · Đang chờ kết nối');
 });
-function mark(id,on){$(id).textContent=on?'BẬT':'TẮT';$(id).style.color=on?'#64e3bb':'#ffba8e';}
-function telemetry(t){
- if($("protocol").value!=="AUTO"&&t.protocol!==$("protocol").value){
-  note('Nhận dữ liệu dạng '+t.protocol+'; bộ giải mã giao thức khác chưa xác thực.');
-  return;
- }
- const value=(id,v,unit,digits)=>$(id).innerHTML=(Number.isFinite(v)?Number(v).toFixed(digits):'--')+'<span class="unit"> '+unit+'</span>';
- value('pack-voltage',t.voltage,'V',2);value('pack-current',t.current,'A',2);
- value('pack-power',t.power,'W',0);value('pack-soc',t.soc,'%',0);
- $('device-detail').textContent='BLE • '+t.protocol+(t.packVerified?' • Đang có telemetry':' • Chưa giải mã pack');
- if(t.packVerified){
-  mark('charge-state',t.charge===1);mark('discharge-state',t.discharge===1);mark('balance-state',t.balance===1);
- }
- const cells=t.cells||[];
- const holder=$('cells-preview');holder.replaceChildren();
- cells.forEach((v,i)=>{
-  const element=document.createElement('div');element.className='cell';
-  const number=document.createElement('div');number.className='n';number.textContent='CELL '+String(i+1).padStart(2,'0');
-  const voltage=document.createElement('div');voltage.className='v';voltage.textContent=v.toFixed(3)+' V';
-  element.append(number,voltage);holder.append(element);
- });
- if(cells.length){
-  const min=Math.min(...cells),max=Math.max(...cells);
-  $('min-cell').textContent=min.toFixed(3)+' V';$('max-cell').textContent=max.toFixed(3)+' V';
-  $('delta-cell').textContent=((max-min)*1000).toFixed(0)+' mV';
-  document.querySelector('#overview .row-title span').textContent=cells.length+' cell đang hoạt động';
-  $('cells').querySelector('.empty').textContent=cells.map((v,i)=>'Cell '+(i+1)+': '+v.toFixed(3)+' V').join('   |   ');
- }
+$('copy-log').addEventListener('click',()=>{
+  const output=$('ble-log');output.focus();output.select();
+  if(document.execCommand('copy'))note('Đã sao chép nhật ký BLE.');
+  else note('Không sao chép tự động được. Hãy Ctrl+C trong ô log.');
+});
+$('clear-log').addEventListener('click',()=>{
+  $('ble-log').value='';
+});
+updateConnection('disconnected');
+if(window.chrome && window.chrome.webview){
+  window.chrome.webview.addEventListener('message',receive);
+}else{
+  note('Đang xem giao diện HTML. Chức năng BLE chỉ hoạt động trong JK BMS Studio.');
 }
-function receive(event){
- let data=event.data;if(typeof data==='string'){try{data=JSON.parse(data);}catch{return;}}
- switch(data.type){
- case 'log':note(data.message);break;
- case 'clearDevices':devices.clear();$('device-list').innerHTML='<option value="">Chọn thiết bị BLE...</option>';break;
- case 'device':{
-  if(devices.has(data.address))break;devices.set(data.address,data);
-  const option=document.createElement('option');option.value=data.address;option.textContent=data.name+' ['+data.mac+']';
-  $('device-list').appendChild(option);break;
- }
- case 'status':{
-  let online=data.message==='connected';
-  if(!online){['pack-voltage','pack-current','pack-power','pack-soc'].forEach(id=>$(id).innerHTML='--');}$('connection-status').innerHTML='<b></b> '+(online?'Đã kết nối':data.message==='connecting'?'Đang kết nối':'Chưa kết nối');
-  $('device-status').textContent=online?'ONLINE':'OFFLINE';break;
- }
- case 'frame':if(data.message.startsWith('0x02'))note('Nhận telemetry '+data.message);else note('Nhận '+data.message);break;
- case 'telemetry':telemetry(data);break;
- }
-}
-if(window.chrome?.webview)window.chrome.webview.addEventListener('message',receive);
-else note('Đang xem HTML mẫu độc lập; chưa kết nối được với Bluetooth C++.');
 </script></body></html>
