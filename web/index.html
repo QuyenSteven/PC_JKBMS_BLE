@@ -101,6 +101,19 @@
 .control-toggle{font-size:12px!important;padding:9px 12px!important;min-width:110px}
 .control-toggle:disabled{cursor:not-allowed;opacity:.4}
 @media(max-width:860px){.config-toolbar .action.primary{margin-left:0}.control-actions{margin-left:auto}}
+
+.temperature-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 2px 12px;color:#9cbbd1;font-size:11px;font-weight:750;letter-spacing:1.1px}
+.temperature-heading small{color:#87a6bd;font-size:11px;letter-spacing:0;font-weight:500}
+.temperature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.temperature-extra{margin-top:9px}
+.temperature-grid[hidden]{display:none}
+.temperature-card{display:flex;gap:10px;align-items:center;background:#101b2b;border:1px solid #273b4d;border-radius:12px;padding:12px 10px;min-width:0;min-height:80px}
+.temperature-icon{flex:0 0 36px;width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:#244353;color:#6bdac7;font-size:12px;font-weight:800}
+.temperature-icon.mos{color:#ffd29a;background:#46382f;font-size:10px}
+.temperature-info{min-width:0}.temperature-info span{display:block;color:#93afc3;font-size:11px}.temperature-info strong{display:block;color:#f1f7fc;font-size:22px;letter-spacing:-.3px;margin-top:6px;white-space:nowrap}
+.temperature-card.hot{border-color:#985d4e;background:#332733}.temperature-card.hot strong{color:#ffb19c}
+@media(max-width:1150px){.temperature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:660px){.temperature-grid{grid-template-columns:1fr}}
 </style></head>
 <body><div class="shell">
 <aside><div class="brand"><div class="symbol">JK</div><div><strong>JK BMS</strong><small>DESKTOP STUDIO</small></div></div>
@@ -116,7 +129,18 @@
 <div class="panel device"><div><div class="micro">THIẾT BỊ ĐƯỢC CHỌN</div><h2 id="device-label">Chưa chọn JK BMS</h2><small id="device-detail">Bluetooth • Đang chờ kết nối</small></div><select id="device-list" aria-label="Thiết bị tìm được"><option value="">Chọn thiết bị BLE...</option></select><span class="tag" id="device-status">OFFLINE</span></div>
 <section id="overview" class="view active">
 <div class="metrics"><div class="panel metric"><div class="label">ĐIỆN ÁP PACK</div><div id="pack-voltage" class="value">--<span class="unit"> V</span></div><div class="hint">Điện áp tổng</div></div><div class="panel metric"><div class="label">DÒNG ĐIỆN</div><div id="pack-current" class="value">--<span class="unit"> A</span></div><div class="hint">Sạc / xả</div></div><div class="panel metric"><div class="label">CÔNG SUẤT</div><div id="pack-power" class="value">--<span class="unit"> W</span></div><div class="hint">Công suất tức thời</div></div><div class="panel metric"><div class="label">DUNG LƯỢNG SOC</div><div id="pack-soc" class="value">--<span class="unit"> %</span></div><div class="hint">Dung lượng còn lại</div></div></div>
-<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span id="overview-cell-status">Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
+<div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span id="overview-cell-status">Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div>
+<div class="temperature-heading"><span>NHIỆT ĐỘ BMS</span><small id="temperature-update-state">Chưa có dữ liệu</small></div>
+<div class="temperature-grid">
+  <div class="temperature-card"><div class="temperature-icon">T1</div><div class="temperature-info"><span>Cảm biến nhiệt T1</span><strong id="overview-temp1">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T2</div><div class="temperature-info"><span>Cảm biến nhiệt T2</span><strong id="overview-temp2">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon mos">MOS</div><div class="temperature-info"><span>Nhiệt độ MOSFET</span><strong id="overview-temp-mos">-- °C</strong></div></div>
+</div>
+<div id="extra-temperatures" class="temperature-grid temperature-extra" hidden>
+  <div class="temperature-card"><div class="temperature-icon">T3</div><div class="temperature-info"><span>Cảm biến nhiệt T3</span><strong id="overview-temp3">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T4</div><div class="temperature-info"><span>Cảm biến nhiệt T4</span><strong id="overview-temp4">-- °C</strong></div></div>
+  <div class="temperature-card"><div class="temperature-icon">T5</div><div class="temperature-info"><span>Cảm biến nhiệt T5</span><strong id="overview-temp5">-- °C</strong></div></div>
+</div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
 </section>
 <section id="cells" class="view">
   <div class="panel cell-dashboard">
@@ -321,7 +345,36 @@ function renderCells(cells) {
   $('cell-bars').replaceChildren(bars);
   $('cells-preview').replaceChildren(preview);
 }
+function clearTemperatures(){
+  for(const id of ['overview-temp1','overview-temp2','overview-temp-mos','overview-temp3','overview-temp4','overview-temp5']){
+    setText(id,'-- °C');
+    $(id).closest('.temperature-card')?.classList.remove('hot');
+  }
+  $('extra-temperatures').hidden=true;
+  setText('temperature-update-state','Chưa có dữ liệu');
+}
+function updateTemperatures(t){
+  const fields=[
+    ['overview-temp1','temperature1'],
+    ['overview-temp2','temperature2'],
+    ['overview-temp-mos','mosTemperature'],
+    ['overview-temp3','temperature3'],
+    ['overview-temp4','temperature4'],
+    ['overview-temp5','temperature5']
+  ];
+  let found=0,extra=false;
+  for(const [id,key] of fields){
+    const value=t[key];
+    const valid=typeof value==='number'&&Number.isFinite(value)&&value>=-55&&value<=145;
+    setText(id,valid?value.toFixed(1)+' °C':'-- °C');
+    $(id).closest('.temperature-card')?.classList.toggle('hot',valid&&value>=60);
+    if(valid){found++;if(['temperature3','temperature4','temperature5'].includes(key))extra=true;}
+  }
+  $('extra-temperatures').hidden=!extra;
+  setText('temperature-update-state',found?found+' cảm biến đang đọc':'Chưa có dữ liệu cảm biến');
+}
 function resetMeasurements() {
+  clearTemperatures();
   metric('pack-voltage',null,'V',2);metric('pack-current',null,'A',2);
   metric('pack-power',null,'W',0);metric('pack-soc',null,'%',0);
   ['charge-state','discharge-state','balance-state'].forEach(id => setOverviewState(id,null));
@@ -336,6 +389,7 @@ function handleTelemetry(t) {
   if (!Array.isArray(t.cells)) return;
   const cells = t.cells.filter(v=>typeof v==='number'&&Number.isFinite(v)&&v>0&&v<6);
   renderCells(cells);
+  updateTemperatures(t);
   const canReadPack = t.packVerified === true;
   metric('pack-voltage',canReadPack?t.voltage:null,'V',2);
   metric('pack-current',canReadPack?t.current:null,'A',2);
