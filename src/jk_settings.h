@@ -38,8 +38,8 @@ inline std::vector<Setting> const& settings(){
  {"cell_ovp","Điện áp cell","Cell OVP","V",18,-1,0x04,0x04,0,4,0,1000,1,Encoding::UInt32,Encoding::Float32,1.2,4.35,3},
  {"cell_ovpr","Điện áp cell","Cell OVP recovery","V",22,-1,0x05,0x05,0,4,0,1000,1,Encoding::UInt32,Encoding::Float32,1.2,4.35,3},
  {"balance_delta","Cân bằng","Delta bắt đầu cân bằng","V",26,106,0x06,0x06,0x64,4,4,1000,1,Encoding::UInt32,Encoding::Float32,0.002,1.0,3},
- {"soc100_voltage","SOC","Cell SOC 100%","V",30,-1,0x07,0x07,0,4,0,1000,1,Encoding::UInt32,Encoding::Float32,0.0,4.35,3,false},
- {"soc0_voltage","SOC","Cell SOC 0%","V",34,-1,0x08,0x08,0,4,0,1000,1,Encoding::UInt32,Encoding::Float32,0.0,4.35,3,false},
+ {"soc100_voltage","SOC","Cell SOC 100%","V",30,-1,0x07,0x07,0,4,0,1000,1,Encoding::UInt32,Encoding::Float32,1.5,4.35,3,
+ {"soc0_voltage","SOC","Cell SOC 0%","V",34,-1,0x08,0x08,0,4,0,1000,1,Encoding::UInt32,Encoding::Float32,1.5,4.35,3,
  {"power_off_voltage","Điện áp cell","Ngắt nguồn điện áp cell","V",46,38,0x0B,0x0B,0x20,4,4,1000,1,Encoding::UInt32,Encoding::Float32,1.2,4.35,3},
  {"max_charge_current","Dòng điện","Giới hạn dòng sạc","A",50,-1,0x0C,0x0C,0,4,0,1000,1,Encoding::UInt32,Encoding::Float32,1.0,600.0,1},
  {"charge_ocp_delay","Dòng điện","Trễ quá dòng sạc","s",54,-1,0x0D,0x0D,0,4,0,1,1,Encoding::UInt32,Encoding::Float32,2,600,0},
@@ -57,7 +57,7 @@ inline std::vector<Setting> const& settings(){
  {"charge_utp_recovery","Nhiệt độ","Hồi phục nhiệt thấp sạc","°C",102,-1,0x19,0x19,0,4,0,10,1,Encoding::Int32,Encoding::Float32,-45,40,1},
  {"mos_otp","Nhiệt độ","MOSFET quá nhiệt","°C",106,-1,0x1A,0x1A,0,4,0,10,1,Encoding::Int32,Encoding::Float32,40,130,1},
  {"mos_otp_recovery","Nhiệt độ","MOSFET hồi phục nhiệt","°C",110,-1,0x1B,0x1B,0,4,0,10,1,Encoding::Int32,Encoding::Float32,20,120,1},
- {"cell_count","Pin","Số cell thiết lập","cell",114,34,0x1C,0x1C,0x1C,4,2,1,1,Encoding::UInt32,Encoding::UInt16,2,32,0,false},
+ {"cell_count","Pin","Số cell thiết lập","cell",114,34,0x1C,0x1C,0x1C,4,2,1,1,Encoding::UInt32,Encoding::UInt16,2,32,0,
  {"charge_mos","MOSFET","Charge MOS","",118,-1,0x1D,0x1D,0,4,0,1,1,Encoding::UInt32,Encoding::UInt8,0,1,0},
  {"discharge_mos","MOSFET","Discharge MOS","",122,-1,0x1E,0x1E,0,4,0,1,1,Encoding::UInt32,Encoding::UInt8,0,1,0},
  {"balance_switch","Cân bằng","Bật cân bằng","",126,114,0x1F,0x1F,0x6C,4,1,1,1,Encoding::UInt32,Encoding::UInt8,0,1,0},
@@ -132,6 +132,8 @@ inline bool crossCheck(std::string const& id,double value,std::vector<uint8_t> c
  };
  auto checkAbove=[&](char const* key){auto v=get(key);return !v||value > *v;};
  auto checkBelow=[&](char const* key){auto v=get(key);return !v||value < *v;};
+ if(id=="soc100_voltage")return checkAbove("soc0_voltage");
+ if(id=="soc0_voltage")return checkBelow("soc100_voltage");
  if(id=="cell_ovp")return checkAbove("cell_ovpr");
  if(id=="cell_ovpr")return checkBelow("cell_ovp");
  if(id=="cell_uvp")return checkBelow("cell_uvpr");
