@@ -33,10 +33,15 @@ jobs:
         run: |
           node tests/webui_smoke.cjs
           if ($LASTEXITCODE -ne 0) { throw "WebUI smoke tests failed" }
+          node --check web/settings.js
+          if ($LASTEXITCODE -ne 0) { throw "Settings JavaScript syntax check failed" }
+          node tests/settings_ui_smoke.cjs
+          if ($LASTEXITCODE -ne 0) { throw "Settings editor and guarded write tests failed" }
       - uses: actions/upload-artifact@v4
         with:
           name: JK-BMS-PC-Windows-x64
           path: |
             x64/Release/*.exe
             x64/Release/web/index.html
+            x64/Release/web/settings.js
           if-no-files-found: error

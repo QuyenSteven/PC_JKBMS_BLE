@@ -31,6 +31,8 @@
 #include <thread>
 #include <vector>
 #include "jk_protocol.h"
+#include "jk_settings.h"
+#include <optional>
 #pragma comment(lib,"WindowsApp.lib")
 #pragma comment(lib,"Ole32.lib")
 #pragma comment(lib,"Shell32.lib")
@@ -50,7 +52,7 @@ ComPtr<ICoreWebView2> browser;
 std::atomic<bool> running{true};
 std::mutex queueMutex,deviceMutex,rawMutex;
 std::condition_variable queueReady;
-struct Command {std::wstring action;uint64_t address=0;};
+struct Command {std::wstring action;uint64_t address=0;std::wstring payload;};
 std::deque<Command> commands;
 std::map<uint64_t,std::wstring> addresses;
 std::vector<uint8_t> rawBytes;
@@ -62,6 +64,18 @@ std::atomic<uint64_t> receivedChunks{0};
 std::atomic<uint64_t> receivedFrames{0};
 std::atomic<jk::Protocol> protocol{jk::Protocol::Auto};
 ULONGLONG lastStatusRequestMs=0,connectedAtMs=0;
+std::mutex settingsMutex;
+std::vector<uint8_t> latestSettings;
+ULONGLONG lastSettingsMs=0;
+std::wstring activeModel,activeHardware,activeSoftware,activeSerial,activeMac;
+std::atomic<jk::Protocol> observedProtocol{jk::Protocol::Auto};
+struct PendingWrite{
+ std::string key;double value=0;
+ uint32_t raw=0; jk::Protocol protocol=jk::Protocol::Auto;
+ ULONGLONG deadline=0,nextPoll=0,started=0;int confirmations=0;
+};
+std::optional<PendingWrite> pendingWrite;
+std::atomic<bool> expectingRestart{false};
 BluetoothLEAdvertisementWatcher watcher{nullptr};
 BluetoothLEDevice bms{nullptr};
 GattCharacteristic notifyChar{nullptr},writeChar{nullptr};
@@ -79,13 +93,84 @@ void emit(std::wstring json){auto ptr=new UiEvent{std::move(json)};if(!hwnd||!Po
 void field(std::wstring const& type,std::wstring const& value){emit(L"{\"type\":\""+type+L"\",\"message\":\""+jsonEscape(value)+L"\"}");}
 void log(std::wstring text){field(L"log",text);}
 std::wstring hex(uint64_t v){std::wstringstream s;s<<std::hex<<std::uppercase<<std::setw(12)<<std::setfill(L'0')<<v;return s.str();}
+std::wstring fromUtf8(std::string const& str){
+ if(str.empty())return {};
+ auto n=MultiByteToWideChar(CP_UTF8,0,str.data(),static_cast<int>(str.size()),nullptr,0);
+ if(n<=0)return {};
+ std::wstring out(static_cast<size_t>(n),L' ');
+ MultiByteToWideChar(CP_UTF8,0,str.data(),static_cast<int>(str.size()),out.data(),n);
+ return out;
+}
+std::string narrowAscii(std::wstring const& text){
+ std::string out;for(wchar_t c:text){if(c<32||c>126)return {};out.push_back(static_cast<char>(c));}return out;
+}
+jk::Protocol effectiveProtocol(){
+ auto observed=observedProtocol.load(),requested=protocol.load();
+ if(requested==jk::Protocol::Auto)return observed;
+ if(observed!=jk::Protocol::Auto && observed!=requested)return jk::Protocol::Auto;
+ return requested;
+}
+void settingStatus(std::string const& id,std::wstring state,std::wstring detail){
+ emit(L"{\"type\":\"settingWrite\",\"key\":\""+fromUtf8(id)+L"\",\"state\":\""+state+L"\",\"message\":\""+jsonEscape(detail)+L"\"}");
+}
+std::wstring parseAscii(std::vector<uint8_t> const& b,size_t offset,size_t len){
+ std::wstring out;
+ for(size_t i=offset;i<offset+len&&i<b.size();i++){
+  uint8_t c=b[i];if(c==0)break;
+  if(c>=32 && c<127)out.push_back(static_cast<wchar_t>(c));
+ }
+ return out;
+}
+void emitSettings(){
+ std::vector<uint8_t> frame;std::wstring model,software,serial,mac;
+ {
+  std::lock_guard lock(settingsMutex);
+  frame=latestSettings;model=activeModel;software=activeSoftware;serial=activeSerial;mac=activeMac;
+ }
+ auto p=effectiveProtocol();
+ if(frame.size()!=300||p==jk::Protocol::Auto)return;
+ std::wostringstream stream;
+ stream<<L"{\"type\":\"settings\",\"protocol\":\""<<jk::name(p)
+       <<L"\",\"model\":\""<<jsonEscape(model)
+       <<L"\",\"firmware\":\""<<jsonEscape(software)
+       <<L"\",\"serial\":\""<<jsonEscape(serial)
+       <<L"\",\"mac\":\""<<jsonEscape(mac)
+       <<L"\",\"ready\":"<<((observedProtocol.load()==p && !model.empty())?L"true":L"false")
+       <<L",\"fields\":[";
+ bool first=true;
+ for(auto const& descriptor:jk::settings()){
+  auto value=jk::readSetting(frame,descriptor,p);
+  if(!value||!std::isfinite(*value))continue;
+  if(!first)stream<<L",";
+  first=false;
+  stream<<L"{\"id\":\""<<fromUtf8(descriptor.id)
+        <<L"\",\"group\":\""<<jsonEscape(fromUtf8(descriptor.group))
+        <<L"\",\"label\":\""<<jsonEscape(fromUtf8(descriptor.label))
+        <<L"\",\"unit\":\""<<jsonEscape(fromUtf8(descriptor.unit))
+        <<L"\",\"value\":"<<std::fixed<<std::setprecision(5)<<*value
+        <<L",\"min\":"<<descriptor.min<<L",\"max\":"<<descriptor.max
+        <<L",\"precision\":"<<static_cast<int>(descriptor.precision)
+        <<L",\"writable\":"<<(jk::canWrite(descriptor,p)?L"true":L"false")
+        <<L",\"register\":"<<static_cast<unsigned>(jk::reg(descriptor,p))<<L"}";
+ }
+ stream<<L"]}";
+ emit(stream.str());
+}
 std::wstring winrtError(){try{throw;}catch(winrt::hresult_error const& e){return e.message().c_str();}catch(std::exception const& e){std::wstring w;std::string s=e.what();w.assign(s.begin(),s.end());return w;}catch(...){return L"Unexpected exception";}}
-void enqueue(std::wstring action,uint64_t address=0){{std::lock_guard lock(queueMutex);commands.push_back({std::move(action),address});}queueReady.notify_one();}
+void enqueue(std::wstring action,uint64_t address=0,std::wstring payload=L""){{std::lock_guard lock(queueMutex);commands.push_back({std::move(action),address,std::move(payload)});}queueReady.notify_one();}
 void stopScanner(){
  if(watcher){try{watcher.Stop();}catch(...){}try{watcher.Received(watchToken);}catch(...){}watcher=nullptr;}
 }
 void disconnectBms(){
  bool wasConnected=(bool)bms;
+ {
+  std::lock_guard lock(settingsMutex);
+  if(pendingWrite)settingStatus(pendingWrite->key,L"failed",L"Ngắt BLE trước khi xác minh ghi.");
+  pendingWrite.reset();latestSettings.clear();lastSettingsMs=0;
+  activeModel.clear();activeHardware.clear();activeSoftware.clear();activeSerial.clear();activeMac.clear();
+ }
+ observedProtocol=jk::Protocol::Auto;
+ emit(L"{\"type\":\"settingsClear\"}");
  stopScanner();
  {std::lock_guard lock(frameMutex);frames.reset();}
  lastTelemetryMs=0;deviceInfoReceived=false;lastStatusRequestMs=0;connectedAtMs=0;receivedChunks=0;receivedFrames=0;
@@ -116,12 +201,58 @@ void parseFrame(std::vector<uint8_t> const& b){
  uint8_t type=b[4];
  receivedFrames++;
  field(L"frame",L"0x0"+std::to_wstring(type)+L" ("+std::to_wstring(b.size())+L" bytes)");
- if(type==3) {deviceInfoReceived=true;enqueue(L"read_status");return;}
+ if(type==3){
+  deviceInfoReceived=true;
+  {
+   std::lock_guard lock(settingsMutex);
+   activeModel=parseAscii(b,6,16);
+   activeHardware=parseAscii(b,22,8);
+   activeSoftware=parseAscii(b,30,8);
+   activeSerial=parseAscii(b,86,11);
+  }
+  emit(L"{\"type\":\"deviceInfo\",\"serial\":\""+jsonEscape(parseAscii(b,86,11))+L"\",\"model\":\""+jsonEscape(parseAscii(b,6,16))+
+       L"\",\"hardware\":\""+jsonEscape(parseAscii(b,22,8))+
+       L"\",\"firmware\":\""+jsonEscape(parseAscii(b,30,8))+L"\"}");
+  emitSettings();
+  enqueue(L"read_status");return;
+ }
+ if(type==1){
+  bool verified=false;std::string id;std::wstring message;
+  {
+   std::lock_guard lock(settingsMutex);
+   latestSettings=b;
+   lastSettingsMs=GetTickCount64();
+   if(pendingWrite) {
+    auto const* spec=jk::findSetting(pendingWrite->key);
+    if(spec && pendingWrite->started && lastSettingsMs>=pendingWrite->started){
+     auto actual=jk::readSetting(b,*spec,pendingWrite->protocol);
+     auto expected=jk::encodeValue(*spec,pendingWrite->protocol,pendingWrite->value);
+     auto rawActual=actual?jk::encodeValue(*spec,pendingWrite->protocol,*actual):std::optional<uint32_t>{};
+     // A matching value must be seen in two subsequent Settings responses;
+     // a successful BLE write alone is never an ACK for persistence.
+     if(rawActual&&expected&&*rawActual==*expected) {
+      pendingWrite->confirmations++;
+      if(pendingWrite->confirmations>=2){
+       id=pendingWrite->key;verified=true;pendingWrite.reset();
+      }else id=pendingWrite->key;
+     }else{
+      pendingWrite->confirmations=0;
+      id=pendingWrite->key;message=L"Readback chưa trùng, đang thử lại.";
+     }
+    }
+   }
+  }
+  if(verified)settingStatus(id,L"verified",L"Đã đối chiếu hai lần đọc lại từ BMS.");
+  else if(!id.empty())settingStatus(id,L"pending",message.empty()?L"Đã đối chiếu lần một, đang kiểm tra lại.":message);
+  emitSettings();
+  return;
+ }
  if(type!=2)return;
  lastTelemetryMs=GetTickCount64();
  auto decoded=jk::decode(b,protocol.load());
- if(!decoded){log(L"RX 0x02 valid CRC, but selected protocol could not decode plausible measurements. Try AUTO / JK04 / JK02_24S.");return;}
+ if(!decoded){log(L"RX 0x02 hợp lệ CRC, chưa giải mã được model đang chọn.");return;}
  auto& t=*decoded;
+ if(observedProtocol!=t.protocol){observedProtocol=t.protocol;emitSettings();}
  std::wstringstream json;
  json<<L"{\"type\":\"telemetry\",\"protocol\":\"";
  json<<jk::name(t.protocol)<<L"\",\"cells\":[";
@@ -157,7 +288,9 @@ void sendRead(uint8_t command){
  log(L"TX 0x"+std::wstring(cmd)+L" result "+std::to_wstring(static_cast<int>(result)));
 }
 void connectBms(uint64_t address){
- disconnectBms();status=L"connecting";field(L"status",status);
+ disconnectBms();
+ {std::lock_guard lock(settingsMutex);activeMac=hex(address);}
+ status=L"connecting";field(L"status",status);
  log(L"Connecting to "+hex(address));
  auto target=BluetoothLEDevice::FromBluetoothAddressAsync(address).get();
  if(!target)throw std::runtime_error("BluetoothLEDevice not found");
@@ -191,6 +324,72 @@ void connectBms(uint64_t address){
  sendRead(0x97); // Request device info first; response 0x03 triggers status poll 0x96
  log(L"Device info requested; status 0x96 will follow after device response.");
 }
+bool sendPayload(std::array<uint8_t,20> const& frame) {
+ if(!writeChar)return false;
+ DataWriter writer;writer.WriteBytes(frame);
+ auto props=static_cast<uint32_t>(writeChar.CharacteristicProperties());
+ auto option=(props&static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse))?
+  GattWriteOption::WriteWithoutResponse:GattWriteOption::WriteWithResponse;
+ return writeChar.WriteValueAsync(writer.DetachBuffer(),option).get()==GattCommunicationStatus::Success;
+}
+void changeSetting(std::wstring const& payload){
+ auto split=payload.find(L':');if(split==std::wstring::npos){log(L"Invalid setting command");return;}
+ auto key=narrowAscii(payload.substr(0,split));
+ std::wstring number=payload.substr(split+1);
+ wchar_t* tail=nullptr;double value=wcstod(number.c_str(),&tail);
+ auto const* spec=jk::findSetting(key);
+ if(!spec||!tail||tail==number.c_str()||*tail!=0||!std::isfinite(value)){
+  settingStatus(key,L"failed",L"Giá trị hoặc khóa tham số không hợp lệ.");return;
+ }
+ auto p=effectiveProtocol();
+ std::vector<uint8_t> baseline;ULONGLONG age=0;std::wstring model;
+ {
+  std::lock_guard lock(settingsMutex);
+  if(pendingWrite){settingStatus(key,L"failed",L"Đang xác minh một thay đổi khác.");return;}
+  baseline=latestSettings;age=lastSettingsMs;model=activeModel;
+ }
+ if(!writeChar||p==jk::Protocol::Auto||observedProtocol.load()!=p||model.empty()||
+    baseline.size()!=300||!age||GetTickCount64()-age>30000){
+  settingStatus(key,L"failed",L"Cần kết nối, nhận dạng firmware và đọc Settings mới trong 30 giây trước khi ghi.");return;
+ }
+ if(!jk::canWrite(*spec,p)||!jk::validSetting(*spec,value)||!jk::crossCheck(key,value,baseline,p)){
+  settingStatus(key,L"failed",L"Model không hỗ trợ hoặc giá trị vượt giới hạn / xung đột bảo vệ.");return;
+ }
+ auto initial=jk::readSetting(baseline,*spec,p);
+ auto encoded=jk::encodeValue(*spec,p,value);
+ if(!initial||!encoded){
+  settingStatus(key,L"failed",L"Không xác thực được dữ liệu hiện tại hoặc mã hóa giá trị.");return;
+ }
+ auto oldRaw=jk::encodeValue(*spec,p,*initial);
+ if(oldRaw&&*oldRaw==*encoded){settingStatus(key,L"verified",L"Giá trị đã trùng với thiết bị, không cần ghi.");return;}
+ auto frame=jk::settingWriteFrame(*spec,p,value);
+ if(frame[0]!=0xAA){settingStatus(key,L"failed",L"Không tạo được khung ghi.");return;}
+ {
+  std::lock_guard lock(settingsMutex);
+  pendingWrite=PendingWrite{key,value,*encoded,p,GetTickCount64()+12000,GetTickCount64()+400,GetTickCount64(),0};
+ }
+ settingStatus(key,L"pending",L"Đã gửi yêu cầu ghi; đang chờ BMS đọc lại hai lần.");
+ if(!sendPayload(frame)){
+  std::lock_guard lock(settingsMutex);pendingWrite.reset();
+  settingStatus(key,L"failed",L"Windows BLE từ chối ghi khung.");return;
+ }
+ log(L"TX SET 0x"+hex(frame[4]).substr(10)+L" target "+fromUtf8(key)+L" (awaiting fresh 0x01 readback)");
+}
+void restartBms(){
+ if(!writeChar||effectiveProtocol()==jk::Protocol::Auto||observedProtocol.load()!=effectiveProtocol()){
+  settingStatus("restart",L"failed",L"Chưa nhận dạng BMS; không gửi restart.");return;
+ }
+ {
+  std::lock_guard lock(settingsMutex);
+  if(activeModel.empty()||latestSettings.size()!=300||!lastSettingsMs||
+     GetTickCount64()-lastSettingsMs>30000||pendingWrite){
+   settingStatus("restart",L"failed",L"Chưa có Settings mới hoặc đang ghi cấu hình.");return;
+  }
+ }
+ if(!sendPayload(jk::request(0x66))){settingStatus("restart",L"failed",L"BLE từ chối gửi lệnh reboot.");return;}
+ settingStatus("restart",L"sent",L"Đã gửi 0x66; BMS có thể ngắt kết nối. Chưa thể xác minh khởi động lại qua BLE.");
+ log(L"TX REBOOT 0x66 (explicit user command)");
+}
 void saveRaw(){
  wchar_t path[MAX_PATH]{};
  PWSTR local=nullptr;
@@ -220,9 +419,28 @@ void bleWorker(){
      else if(cmd.action==L"connect")connectBms(cmd.address);
      else if(cmd.action==L"disconnect")disconnectBms();
      else if(cmd.action==L"save")saveRaw();
+     else if(cmd.action==L"refresh_settings"){if(writeChar)sendRead(0x96);}
+     else if(cmd.action==L"change_setting")changeSetting(cmd.payload);
+     else if(cmd.action==L"restart")restartBms();
      else if(cmd.action==L"read_status" && writeChar){
       sendRead(0x96);lastStatusRequestMs=GetTickCount64();
      }
+    }
+    {
+     std::string failed;
+     bool doRead=false;
+     {
+      std::lock_guard lock(settingsMutex);
+      if(pendingWrite){
+       if(GetTickCount64()>pendingWrite->deadline){
+        failed=pendingWrite->key;pendingWrite.reset();
+       }else if(GetTickCount64()>=pendingWrite->nextPoll){
+        doRead=true;pendingWrite->nextPoll=GetTickCount64()+1600;
+       }
+      }
+     }
+     if(!failed.empty())settingStatus(failed,L"failed",L"Hết thời gian xác minh: BMS chưa trả về giá trị mong đợi.");
+     if(doRead){sendRead(0x96);lastStatusRequestMs=GetTickCount64();}
     }
     // JK reference integration polls 0x96 periodically until frame 0x02 is received.
     // Once streaming, retry only when status becomes stale. No configuration writes.
@@ -265,6 +483,9 @@ void initBrowser(){
        LPWSTR str=nullptr;if(FAILED(event->TryGetWebMessageAsString(&str)))return S_OK;
        std::wstring cmd(str);CoTaskMemFree(str);
        if(cmd==L"scan"||cmd==L"disconnect"||cmd==L"save")enqueue(cmd);
+       else if(cmd==L"settings:read")enqueue(L"refresh_settings");
+       else if(cmd==L"bms:restart")enqueue(L"restart");
+       else if(cmd.rfind(L"settings:write:",0)==0)enqueue(L"change_setting",0,cmd.substr(15));
        else if(cmd.rfind(L"protocol:",0)==0){
         auto p=cmd.substr(9);
         if(p==L"JK02_24S")protocol=jk::Protocol::JK02_24S;
