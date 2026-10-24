@@ -51,6 +51,8 @@ struct Command {std::wstring action;uint64_t address=0;};
 std::deque<Command> commands;
 std::map<uint64_t,std::wstring> addresses;
 std::vector<uint8_t> rawBytes;
+std::vector<uint8_t> frameBuffer;
+std::mutex frameMutex;
 BluetoothLEAdvertisementWatcher watcher{nullptr};
 BluetoothLEDevice bms{nullptr};
 GattCharacteristic notifyChar{nullptr},writeChar{nullptr};
@@ -98,10 +100,8 @@ void scanBms(){
  });
  watcher.Start();log(L"Scanning BLE advertisements...");
 }
-constexpr winrt::guid service{0x0000FFE0,0,0x1000,{0x80,0,0,0,0x80,0x5F,0x9B,0x34,0xFB}};
-constexpr winrt::guid characteristic{0x0000FFE1,0,0x1000,{0x80,0,0,0,0x80,0x5F,0x9B,0x34,0xFB}};
-std::vector<uint8_t> frameBuffer;
-std::mutex frameMutex;
+const winrt::guid service{0x0000FFE0,0,0x1000,{0x80,0x00,0x00,0x80,0x5F,0x9B,0x34,0xFB}};
+const winrt::guid characteristic{0x0000FFE1,0,0x1000,{0x80,0x00,0x00,0x80,0x5F,0x9B,0x34,0xFB}};
 void parseFrame(std::vector<uint8_t> const& b){
  if(b.size()!=300&&b.size()!=320)return;
  uint8_t type=b[4];
