@@ -51,22 +51,45 @@ assert.equal(element('overview-temp1').textContent,'25.3 °C');
 assert.equal(element('overview-temp2').textContent,'30.1 °C');
 assert.equal(element('overview-temp-mos').textContent,'42.5 °C');
 assert.equal(element('overview-temp3').textContent,'31.0 °C');
-assert.equal(element('extra-temperatures').hidden,true); // T5 only; always show T3/T4
-assert.ok(html.includes('<div class="temperature-icon">T3</div>'));
-assert.ok(html.includes('<div class="temperature-icon">T4</div>'));
-assert.ok(html.indexOf('overview-temp3') < html.indexOf('id="extra-temperatures"'));
-assert.ok(html.indexOf('overview-temp4') < html.indexOf('id="extra-temperatures"'));
+// Cards are always ordered T1 → T5 → MOS in one contiguous grid.
+const orderedIds=['temperature-card1','temperature-card2','temperature-card3','temperature-card4','temperature-card5','temperature-card-mos'];
+let lastPos=-1;
+for(const id of orderedIds){
+  const pos=html.indexOf('id="'+id+'"');
+  assert.ok(pos>lastPos,'Wrong temperature card order '+id);
+  lastPos=pos;
+}
+assert.equal(element('temperature-grid').hidden,false);
+assert.equal(element('temperature-card1').hidden,false);
+assert.equal(element('temperature-card2').hidden,false);
+assert.equal(element('temperature-card3').hidden,false);
+assert.equal(element('temperature-card4').hidden,true);
+assert.equal(element('temperature-card5').hidden,true);
+assert.equal(element('temperature-card-mos').hidden,false);
 emit({type:'telemetry',protocol:'JK02_32S',packVerified:true,voltage:26.77,current:0,power:0,soc:100,
- charge:1,discharge:0,balance:0,temperature1:23.1,temperature2:23.2,mosTemperature:28.4,temperature3:null,temperature4:null,temperature5:null,
+ charge:1,discharge:0,balance:0,temperature1:null,temperature2:33.4,mosTemperature:null,temperature3:null,temperature4:null,temperature5:36.2,
  cells:[3.348,3.348,3.345,3.345,3.348,3.345,3.345,3.345]});
-assert.equal(element('overview-temp3').textContent,'-- °C');
-assert.equal(element('overview-temp4').textContent,'-- °C');
-assert.equal(element('extra-temperatures').hidden,true);
+assert.equal(element('overview-temp2').textContent,'33.4 °C');
+assert.equal(element('overview-temp5').textContent,'36.2 °C');
+for(const id of ['temperature-card1','temperature-card3','temperature-card4','temperature-card-mos']){
+ assert.equal(element(id).hidden,true,'Must hide invalid '+id);
+}
+assert.equal(element('temperature-card2').hidden,false);
+assert.equal(element('temperature-card5').hidden,false);
+assert.equal(element('temperature-grid').hidden,false);
+assert.equal(element('temperature-update-state').textContent,'2 cảm biến đang đọc');
+emit({type:'telemetry',protocol:'JK02_32S',packVerified:true,voltage:26.77,current:0,power:0,soc:100,
+ charge:1,discharge:0,balance:0,temperature1:null,temperature2:null,mosTemperature:null,temperature3:null,temperature4:null,temperature5:null,
+ cells:[3.348,3.348,3.345,3.345,3.348,3.345,3.345,3.345]});
+assert.equal(element('temperature-grid').hidden,true);
+assert.equal(element('temperature-empty').hidden,false);
 emit({type:'telemetry',protocol:'JK02_32S',packVerified:true,voltage:26.77,current:0,power:0,soc:100,
  charge:1,discharge:0,balance:0,temperature1:23.1,temperature2:23.2,mosTemperature:28.4,temperature3:24.3,temperature4:25.4,temperature5:26.5,
  cells:[3.348,3.348,3.345,3.345,3.348,3.345,3.345,3.345]});
 assert.equal(element('overview-temp4').textContent,'25.4 °C');
-assert.equal(element('extra-temperatures').hidden,false);
+assert.equal(element('temperature-card-mos').hidden,false);
+assert.equal(element('temperature-card5').hidden,false);
+assert.equal(element('temperature-grid').hidden,false);
 assert.equal(element('cell-grid-page').children.length,8);
 assert.equal(element('cell-bars').children.length,8);
 assert.equal(element('cells-count').textContent,'8');
@@ -81,5 +104,6 @@ assert.equal(element('cells-count').textContent,'--');
 assert.equal(element('ctrl-charge').textContent,'--');
 assert.equal(element('device-status').textContent,'OFFLINE');
 assert.equal(element('overview-temp1').textContent,'-- °C');
-assert.equal(element('extra-temperatures').hidden,true);
+assert.equal(element('temperature-grid').hidden,true);
+assert.equal(element('temperature-empty').hidden,false);
 console.log('WebUI smoke test: dynamic cells, chart, BLE states, protection and reset PASS');
