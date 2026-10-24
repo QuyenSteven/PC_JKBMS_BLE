@@ -104,16 +104,15 @@
 
 .temperature-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 2px 12px;color:#9cbbd1;font-size:11px;font-weight:750;letter-spacing:1.1px}
 .temperature-heading small{color:#87a6bd;font-size:11px;letter-spacing:0;font-weight:500}
-.temperature-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
-.temperature-extra{margin-top:9px}
-.temperature-grid[hidden]{display:none}
+.temperature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px}
+.temperature-grid[hidden],.temperature-card[hidden],.temperature-empty[hidden]{display:none!important}
+.temperature-empty{padding:24px 14px;border:1px dashed #2b4459;border-radius:11px;text-align:center;color:#8ca9bd;font-size:12px}
 .temperature-card{display:flex;gap:10px;align-items:center;background:#101b2b;border:1px solid #273b4d;border-radius:12px;padding:12px 10px;min-width:0;min-height:80px}
 .temperature-icon{flex:0 0 36px;width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:#244353;color:#6bdac7;font-size:12px;font-weight:800}
 .temperature-icon.mos{color:#ffd29a;background:#46382f;font-size:10px}
 .temperature-info{min-width:0}.temperature-info span{display:block;color:#93afc3;font-size:11px}.temperature-info strong{display:block;color:#f1f7fc;font-size:22px;letter-spacing:-.3px;margin-top:6px;white-space:nowrap}
 .temperature-card.hot{border-color:#985d4e;background:#332733}.temperature-card.hot strong{color:#ffb19c}
-@media(max-width:1450px){.temperature-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:660px){.temperature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:660px){.temperature-grid{grid-template-columns:repeat(auto-fit,minmax(125px,1fr))}}
 
 .device-admin-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin:21px 0}
 .device-kpi-text{font-size:18px!important;letter-spacing:0!important;white-space:normal!important;overflow-wrap:anywhere}
@@ -150,17 +149,16 @@
 <section id="overview" class="view active">
 <div class="metrics"><div class="panel metric"><div class="label">ĐIỆN ÁP PACK</div><div id="pack-voltage" class="value">--<span class="unit"> V</span></div><div class="hint">Điện áp tổng</div></div><div class="panel metric"><div class="label">DÒNG ĐIỆN</div><div id="pack-current" class="value">--<span class="unit"> A</span></div><div class="hint">Sạc / xả</div></div><div class="panel metric"><div class="label">CÔNG SUẤT</div><div id="pack-power" class="value">--<span class="unit"> W</span></div><div class="hint">Công suất tức thời</div></div><div class="panel metric"><div class="label">DUNG LƯỢNG SOC</div><div id="pack-soc" class="value">--<span class="unit"> %</span></div><div class="hint">Dung lượng còn lại</div></div></div>
 <div class="split"><div class="panel"><div class="row-title"><h3>Điện áp từng cell</h3><span id="overview-cell-status">Chưa có dữ liệu</span></div><div class="cellgrid" id="cells-preview"></div><div class="stats"><div class="smallstat"><small>Cell thấp nhất</small><strong id="min-cell">-- V</strong></div><div class="smallstat"><small>Cell cao nhất</small><strong id="max-cell">-- V</strong></div><div class="smallstat"><small>Độ lệch</small><strong id="delta-cell">-- mV</strong></div></div>
-<div class="temperature-heading"><span>NHIỆT ĐỘ BMS</span><small id="temperature-update-state">Chưa có dữ liệu</small></div>
-<div class="temperature-grid">
-  <div class="temperature-card"><div class="temperature-icon">T1</div><div class="temperature-info"><span>Cảm biến nhiệt T1</span><strong id="overview-temp1">-- °C</strong></div></div>
-  <div class="temperature-card"><div class="temperature-icon">T2</div><div class="temperature-info"><span>Cảm biến nhiệt T2</span><strong id="overview-temp2">-- °C</strong></div></div>
-  <div class="temperature-card"><div class="temperature-icon">T3</div><div class="temperature-info"><span>Cảm biến nhiệt T3</span><strong id="overview-temp3">-- °C</strong></div></div>
-  <div class="temperature-card"><div class="temperature-icon">T4</div><div class="temperature-info"><span>Cảm biến nhiệt T4</span><strong id="overview-temp4">-- °C</strong></div></div>
-  <div class="temperature-card"><div class="temperature-icon mos">MOS</div><div class="temperature-info"><span>Nhiệt độ MOSFET</span><strong id="overview-temp-mos">-- °C</strong></div></div>
+<div class="temperature-heading"><span>NHIỆT ĐỘ BMS</span><small id="temperature-update-state">Chưa có dữ liệu cảm biến</small></div>
+<div id="temperature-grid" class="temperature-grid" hidden>
+  <div id="temperature-card1" class="temperature-card" hidden><div class="temperature-icon">T1</div><div class="temperature-info"><span>Cảm biến nhiệt T1</span><strong id="overview-temp1">-- °C</strong></div></div>
+  <div id="temperature-card2" class="temperature-card" hidden><div class="temperature-icon">T2</div><div class="temperature-info"><span>Cảm biến nhiệt T2</span><strong id="overview-temp2">-- °C</strong></div></div>
+  <div id="temperature-card3" class="temperature-card" hidden><div class="temperature-icon">T3</div><div class="temperature-info"><span>Cảm biến nhiệt T3</span><strong id="overview-temp3">-- °C</strong></div></div>
+  <div id="temperature-card4" class="temperature-card" hidden><div class="temperature-icon">T4</div><div class="temperature-info"><span>Cảm biến nhiệt T4</span><strong id="overview-temp4">-- °C</strong></div></div>
+  <div id="temperature-card5" class="temperature-card" hidden><div class="temperature-icon">T5</div><div class="temperature-info"><span>Cảm biến nhiệt T5</span><strong id="overview-temp5">-- °C</strong></div></div>
+  <div id="temperature-card-mos" class="temperature-card" hidden><div class="temperature-icon mos">MOS</div><div class="temperature-info"><span>Nhiệt độ MOSFET</span><strong id="overview-temp-mos">-- °C</strong></div></div>
 </div>
-<div id="extra-temperatures" class="temperature-grid temperature-extra" hidden>
-  <div class="temperature-card"><div class="temperature-icon">T5</div><div class="temperature-info"><span>Cảm biến nhiệt T5</span><strong id="overview-temp5">-- °C</strong></div></div>
-</div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
+<div id="temperature-empty" class="temperature-empty">Chưa có dữ liệu nhiệt độ từ BMS.</div></div></div><div class="panel"><div class="row-title"><h3>Trạng thái hoạt động</h3><span>Realtime</span></div><div class="switchrow"><div>Charge MOS<small>Cho phép sạc pin</small></div><span class="pill" id="charge-state">Chưa biết</span></div><div class="switchrow"><div>Discharge MOS<small>Cho phép xả pin</small></div><span class="pill" id="discharge-state">Chưa biết</span></div><div class="switchrow"><div>Cân bằng cell<small>Active balancing</small></div><span class="pill" id="balance-state">Chưa biết</span></div><div class="switchrow"><div>Cảnh báo<small>Bảo vệ hệ thống</small></div><span class="pill" id="alarm-state">Chưa có dữ liệu</span></div></div></div>
 </section>
 <section id="cells" class="view">
   <div class="panel cell-dashboard">
@@ -404,33 +402,38 @@ function renderCells(cells) {
   $('cell-bars').replaceChildren(bars);
   $('cells-preview').replaceChildren(preview);
 }
+// Fixed order: T1, T2, T3, T4, T5, MOS. No empty sensor card occupies space.
+const temperatureFields=[
+  ['temperature1','overview-temp1','temperature-card1'],
+  ['temperature2','overview-temp2','temperature-card2'],
+  ['temperature3','overview-temp3','temperature-card3'],
+  ['temperature4','overview-temp4','temperature-card4'],
+  ['temperature5','overview-temp5','temperature-card5'],
+  ['mosTemperature','overview-temp-mos','temperature-card-mos']
+];
 function clearTemperatures(){
-  for(const id of ['overview-temp1','overview-temp2','overview-temp-mos','overview-temp3','overview-temp4','overview-temp5']){
-    setText(id,'-- °C');
-    $(id).closest('.temperature-card')?.classList.remove('hot');
+  for(const [,valueId,cardId] of temperatureFields){
+    setText(valueId,'-- °C');
+    $(cardId).hidden=true;
+    $(cardId).classList.remove('hot');
   }
-  $('extra-temperatures').hidden=true;
-  setText('temperature-update-state','Chưa có dữ liệu');
+  $('temperature-grid').hidden=true;
+  $('temperature-empty').hidden=false;
+  setText('temperature-update-state','Chưa có dữ liệu cảm biến');
 }
 function updateTemperatures(t){
-  const fields=[
-    ['overview-temp1','temperature1'],
-    ['overview-temp2','temperature2'],
-    ['overview-temp-mos','mosTemperature'],
-    ['overview-temp3','temperature3'],
-    ['overview-temp4','temperature4'],
-    ['overview-temp5','temperature5']
-  ];
-  let found=0,t5Available=false;
-  for(const [id,key] of fields){
+  let count=0;
+  for(const [key,valueId,cardId] of temperatureFields){
     const value=t[key];
     const valid=typeof value==='number'&&Number.isFinite(value)&&value>=-55&&value<=145;
-    setText(id,valid?value.toFixed(1)+' °C':'-- °C');
-    $(id).closest('.temperature-card')?.classList.toggle('hot',valid&&value>=60);
-    if(valid){found++;if(key==='temperature5')t5Available=true;}
+    setText(valueId,valid?value.toFixed(1)+' °C':'-- °C');
+    $(cardId).hidden=!valid;
+    $(cardId).classList.toggle('hot',valid&&value>=60);
+    if(valid)count++;
   }
-  $('extra-temperatures').hidden=!t5Available;
-  setText('temperature-update-state',found?found+' cảm biến đang đọc':'Chưa có dữ liệu cảm biến');
+  $('temperature-grid').hidden=count===0;
+  $('temperature-empty').hidden=count>0;
+  setText('temperature-update-state',count?count+' cảm biến đang đọc':'Chưa có dữ liệu cảm biến');
 }
 function resetMeasurements() {
   clearTemperatures();
