@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <condition_variable>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <filesystem>
@@ -29,6 +30,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "jk_protocol.h"
 #pragma comment(lib,"WindowsApp.lib")
 #pragma comment(lib,"Ole32.lib")
 #pragma comment(lib,"Shell32.lib")
@@ -52,13 +54,18 @@ struct Command {std::wstring action;uint64_t address=0;};
 std::deque<Command> commands;
 std::map<uint64_t,std::wstring> addresses;
 std::vector<uint8_t> rawBytes;
-std::vector<uint8_t> frameBuffer;
 std::mutex frameMutex;
+jk::FrameAssembler frames;
+std::atomic<ULONGLONG> lastTelemetryMs{0};
+std::atomic<bool> deviceInfoReceived{false};
+std::atomic<uint64_t> receivedChunks{0};
+std::atomic<uint64_t> receivedFrames{0};
+std::atomic<jk::Protocol> protocol{jk::Protocol::Auto};
+ULONGLONG lastStatusRequestMs=0,connectedAtMs=0;
 BluetoothLEAdvertisementWatcher watcher{nullptr};
 BluetoothLEDevice bms{nullptr};
 GattCharacteristic notifyChar{nullptr},writeChar{nullptr};
 winrt::event_token notifyToken{},watchToken{};
-uint8_t requestSequence=0;
 std::wstring status=L"disconnected";
 std::wstring jsonEscape(std::wstring const& input){
  std::wstring out;out.reserve(input.size()+16);
@@ -78,11 +85,13 @@ void stopScanner(){
  if(watcher){try{watcher.Stop();}catch(...){}try{watcher.Received(watchToken);}catch(...){}watcher=nullptr;}
 }
 void disconnectBms(){
+ bool wasConnected=(bool)bms;
  stopScanner();
- {std::lock_guard lock(frameMutex);frameBuffer.clear();}
+ {std::lock_guard lock(frameMutex);frames.reset();}
+ lastTelemetryMs=0;deviceInfoReceived=false;lastStatusRequestMs=0;connectedAtMs=0;receivedChunks=0;receivedFrames=0;
  if(notifyChar){try{notifyChar.ValueChanged(notifyToken);}catch(...){}}
  notifyChar=nullptr;writeChar=nullptr;bms=nullptr;
- status=L"disconnected";field(L"status",status);log(L"Disconnected");
+ status=L"disconnected";field(L"status",status);if(wasConnected)log(L"Disconnected");
 }
 void scanBms(){
  stopScanner();{
@@ -104,58 +113,48 @@ void scanBms(){
 const winrt::guid service{0x0000FFE0,0,0x1000,{0x80,0x00,0x00,0x80,0x5F,0x9B,0x34,0xFB}};
 const winrt::guid characteristic{0x0000FFE1,0,0x1000,{0x80,0x00,0x00,0x80,0x5F,0x9B,0x34,0xFB}};
 void parseFrame(std::vector<uint8_t> const& b){
- if(b.size()!=300&&b.size()!=320)return;
  uint8_t type=b[4];
+ receivedFrames++;
  field(L"frame",L"0x0"+std::to_wstring(type)+L" ("+std::to_wstring(b.size())+L" bytes)");
+ if(type==3) {deviceInfoReceived=true;enqueue(L"read_status");return;}
  if(type!=2)return;
- // Only 32S offsets are decoded in this stage; do not report measurements for unverified layouts.
- auto u16=[&](size_t o)->uint16_t{return uint16_t(b[o]|uint16_t(b[o+1])<<8);};
- auto u32=[&](size_t o)->uint32_t{return uint32_t(b[o])|(uint32_t(b[o+1])<<8)|(uint32_t(b[o+2])<<16)|(uint32_t(b[o+3])<<24);};
- std::wstringstream s;s<<L"{\"type\":\"telemetry\",\"protocol\":\"JK02_32S\",\"cells\":[";
- bool first=true;double min=10,max=0;unsigned n=0;
- uint32_t enabled=u32(70);
- for(unsigned i=0;i<32;i++){if(!(enabled&(1u<<i)))continue;
-  double v=u16(6+i*2)*.001;if(v<1.0||v>5.0)continue;
-  if(!first)s<<L",";s<<std::fixed<<std::setprecision(3)<<v;first=false;
-  min=std::min(min,v);max=std::max(max,v);n++;
+ lastTelemetryMs=GetTickCount64();
+ auto decoded=jk::decode(b,protocol.load());
+ if(!decoded){log(L"RX 0x02 valid CRC, but selected protocol could not decode plausible measurements. Try AUTO / JK04 / JK02_24S.");return;}
+ auto& t=*decoded;
+ std::wstringstream json;
+ json<<L"{\"type\":\"telemetry\",\"protocol\":\"";
+ json<<jk::name(t.protocol)<<L"\",\"cells\":[";
+ for(size_t i=0;i<t.cells.size();i++){if(i)json<<L",";json<<std::fixed<<std::setprecision(3)<<t.cells[i];}
+ json<<L"],\"count\":"<<t.cells.size();
+ if(t.packVerified) {
+  json<<L",\"voltage\":"<<std::fixed<<std::setprecision(3)<<t.voltage
+      <<L",\"current\":"<<t.current<<L",\"power\":"<<t.power
+      <<L",\"soc\":"<<t.soc<<L",\"charge\":"<<t.charge
+      <<L",\"discharge\":"<<t.discharge<<L",\"balance\":"<<t.balance;
  }
- s<<L"],\"count\":"<<n<<L",\"deltaMv\":"<<std::llround((max-min)*1000);
- double voltage=u32(150)*.001;
- double current=(int32_t)u32(154)*.001;
- if(voltage<0||voltage>2000||current < -5000 ||current>5000){log(L"Telemetry rejected: implausible pack values");return;}
- s<<L",\"voltage\":"<<std::fixed<<std::setprecision(3)<<voltage;
- s<<L",\"current\":"<<current<<L",\"power\":"<<voltage*current<<L",\"soc\":"<<(unsigned)b[173];
- s<<L",\"charge\":"<<(unsigned)b[198]<<L",\"discharge\":"<<(unsigned)b[199]<<L",\"balance\":"<<(unsigned)b[201]<<L"}";
- emit(s.str());
+ json<<L",\"packVerified\":"<<(t.packVerified?L"true":L"false")<<L"}";
+ emit(json.str());
 }
 void feed(std::vector<uint8_t> const& chunk){
- std::lock_guard frameLock(frameMutex);
+ receivedChunks++;
  {std::lock_guard lock(rawMutex);rawBytes.insert(rawBytes.end(),chunk.begin(),chunk.end());}
- frameBuffer.insert(frameBuffer.end(),chunk.begin(),chunk.end());
- constexpr std::array<uint8_t,4> prefix{0x55,0xAA,0xEB,0x90};
- while(frameBuffer.size()>=4){
-  auto found=std::search(frameBuffer.begin(),frameBuffer.end(),prefix.begin(),prefix.end());
-  if(found!=frameBuffer.begin())frameBuffer.erase(frameBuffer.begin(),found);
-  if(frameBuffer.size()<300)break;
-  auto good=[&](size_t size){if(frameBuffer.size()<size)return false;uint8_t sum=0;for(size_t i=0;i<size-1;i++)sum=uint8_t(sum+frameBuffer[i]);return sum==frameBuffer[size-1];};
-  size_t length=0;if(good(300))length=300;else if(good(320))length=320;
-  if(!length){if(frameBuffer.size()<320)break;log(L"Invalid BLE frame checksum / unsupported frame length");frameBuffer.erase(frameBuffer.begin());continue;}
-  std::vector<uint8_t> frame(frameBuffer.begin(),frameBuffer.begin()+length);
-  frameBuffer.erase(frameBuffer.begin(),frameBuffer.begin()+length);
-  parseFrame(frame);
- }
- if(frameBuffer.size()>2048){frameBuffer.clear();log(L"Frame assembler reset after overflow");}
+ std::lock_guard lock(frameMutex);
+ uint64_t badBefore=frames.checksumErrors;
+ frames.add(chunk,[](std::vector<uint8_t> const& frame){parseFrame(frame);});
+ if(frames.checksumErrors!=badBefore)
+  log(L"BLE CRC failure: count="+std::to_wstring(frames.checksumErrors)+L", valid="+std::to_wstring(frames.valid));
 }
 void sendRead(uint8_t command){
  if(!writeChar)return;
- std::array<uint8_t,20> bytes{};bytes[0]=0xAA;bytes[1]=0x55;bytes[2]=0x90;bytes[3]=0xEB;bytes[4]=command;bytes[16]=requestSequence++;
- for(int i=0;i<19;i++)bytes[19]=uint8_t(bytes[19]+bytes[i]);
+ auto bytes=jk::request(command);
  DataWriter writer;writer.WriteBytes(bytes);
  auto props=static_cast<uint32_t>(writeChar.CharacteristicProperties());
  auto option=(props&static_cast<uint32_t>(GattCharacteristicProperties::WriteWithoutResponse))?
   GattWriteOption::WriteWithoutResponse:GattWriteOption::WriteWithResponse;
  auto result=writeChar.WriteValueAsync(writer.DetachBuffer(),option).get();
- log(L"TX 0x"+hex(command).substr(10)+L" result "+std::to_wstring(static_cast<int>(result)));
+ wchar_t cmd[12]{};swprintf_s(cmd,L"%02X",(unsigned)command);
+ log(L"TX 0x"+std::wstring(cmd)+L" result "+std::to_wstring(static_cast<int>(result)));
 }
 void connectBms(uint64_t address){
  disconnectBms();status=L"connecting";field(L"status",status);
@@ -188,8 +187,9 @@ void connectBms(uint64_t address){
  auto result=notifyChar.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
  if(result!=GattCommunicationStatus::Success)throw std::runtime_error("Failed to enable BLE notifications");
  status=L"connected";field(L"status",status);log(L"BLE notifications enabled");
- sendRead(0x96);sendRead(0x97);
- log(L"Waiting for periodic frame 0x02 (cell telemetry).");
+ connectedAtMs=GetTickCount64();
+ sendRead(0x97); // Request device info first; response 0x03 triggers status poll 0x96
+ log(L"Device info requested; status 0x96 will follow after device response.");
 }
 void saveRaw(){
  wchar_t path[MAX_PATH]{};
@@ -207,14 +207,35 @@ void bleWorker(){
  try{
   winrt::init_apartment(winrt::apartment_type::multi_threaded);
   while(running){
-   Command cmd;
-   {std::unique_lock lock(queueMutex);queueReady.wait(lock,[]{return !running||!commands.empty();});if(!running)break;cmd=commands.front();commands.pop_front();}
+   Command cmd;bool hasCommand=false;
+   {
+    std::unique_lock lock(queueMutex);
+    queueReady.wait_for(lock,std::chrono::milliseconds(1000),[]{return !running||!commands.empty();});
+    if(!running)break;
+    if(!commands.empty()){cmd=commands.front();commands.pop_front();hasCommand=true;}
+   }
    try{
-    if(cmd.action==L"scan")scanBms();
-    else if(cmd.action==L"connect")connectBms(cmd.address);
-    else if(cmd.action==L"disconnect")disconnectBms();
-    else if(cmd.action==L"save")saveRaw();
-   }catch(...){log(L"BLE: "+winrtError());if(cmd.action==L"connect")disconnectBms();}
+    if(hasCommand) {
+     if(cmd.action==L"scan")scanBms();
+     else if(cmd.action==L"connect")connectBms(cmd.address);
+     else if(cmd.action==L"disconnect")disconnectBms();
+     else if(cmd.action==L"save")saveRaw();
+     else if(cmd.action==L"read_status" && writeChar){
+      sendRead(0x96);lastStatusRequestMs=GetTickCount64();
+     }
+    }
+    // JK reference integration polls 0x96 periodically until frame 0x02 is received.
+    // Once streaming, retry only when status becomes stale. No configuration writes.
+    ULONGLONG now=GetTickCount64();
+    if(writeChar && connectedAtMs && now-connectedAtMs>=1000 &&
+       now-lastStatusRequestMs>=5000 &&
+       (lastTelemetryMs==0||now-lastTelemetryMs.load()>=10000)){
+      log(L"No recent 0x02 telemetry: sending read 0x96 (RX chunks="+
+         std::to_wstring(receivedChunks.load())+L", frames="+
+         std::to_wstring(receivedFrames.load())+L")");
+      sendRead(0x96);lastStatusRequestMs=now;
+    }
+   }catch(...){log(L"BLE: "+winrtError());if(hasCommand&&cmd.action==L"connect")disconnectBms();}
   }
   disconnectBms();
  }catch(...){log(L"BLE worker failed: "+winrtError());}
@@ -244,6 +265,14 @@ void initBrowser(){
        LPWSTR str=nullptr;if(FAILED(event->TryGetWebMessageAsString(&str)))return S_OK;
        std::wstring cmd(str);CoTaskMemFree(str);
        if(cmd==L"scan"||cmd==L"disconnect"||cmd==L"save")enqueue(cmd);
+       else if(cmd.rfind(L"protocol:",0)==0){
+        auto p=cmd.substr(9);
+        if(p==L"JK02_24S")protocol=jk::Protocol::JK02_24S;
+        else if(p==L"JK02_32S")protocol=jk::Protocol::JK02_32S;
+        else if(p==L"JK04")protocol=jk::Protocol::JK04;
+        else protocol=jk::Protocol::Auto;
+        log(L"BLE decoder selected: "+p);
+       }
        else if(cmd.rfind(L"connect:",0)==0){
         try{enqueue(L"connect",std::stoull(cmd.substr(8)));}catch(...){log(L"Invalid BLE address");}
        }
