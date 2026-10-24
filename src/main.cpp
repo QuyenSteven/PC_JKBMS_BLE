@@ -211,7 +211,7 @@ void parseFrame(std::vector<uint8_t> const& b){
    activeSoftware=parseAscii(b,30,8);
    activeSerial=parseAscii(b,86,11);
   }
-  emit(L"{\"type\":\"deviceInfo\",\"serial\":\""+jsonEscape(parseAscii(b,86,11))+L"\",\"model\":\""+jsonEscape(parseAscii(b,6,16))+
+  emit(L"{\"type\":\"deviceInfo\",\"deviceName\":\""+jsonEscape(parseAscii(b,46,16))+L"\",\"serial\":\""+jsonEscape(parseAscii(b,86,11))+L"\",\"model\":\""+jsonEscape(parseAscii(b,6,16))+
        L"\",\"hardware\":\""+jsonEscape(parseAscii(b,22,8))+
        L"\",\"firmware\":\""+jsonEscape(parseAscii(b,30,8))+L"\"}");
   emitSettings();
