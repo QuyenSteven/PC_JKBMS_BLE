@@ -13,7 +13,7 @@
   <!-- Use an explicit NuGet package include directory and static loader to avoid
        reliance on native NuGet props imports across VS2022/VS2026. -->
   <PropertyGroup>
-    <WebView2NativeDir>$(MSBuildProjectDirectory)\packages\microsoft.web.webview2\1.0.2903.40\build\native\</WebView2NativeDir>
+    <WebView2NativeDir>$(MSBuildProjectDirectory)\packages\Microsoft.Web.WebView2.1.0.2903.40\build\native\</WebView2NativeDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -29,8 +29,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup><ClCompile Include="src\main.cpp" /></ItemGroup>
-  <ItemGroup><None Include="web\index.html" /><None Include="NuGet.Config" /></ItemGroup>
-  <ItemGroup><PackageReference Include="Microsoft.Windows.CppWinRT" Version="2.0.240111.5" /><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" /></ItemGroup>
+  <ItemGroup><None Include="web\index.html" /><None Include="packages.config" /></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 
   <Target Name="VerifyWebView2Sdk" BeforeTargets="ClCompile">
