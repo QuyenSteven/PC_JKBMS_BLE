@@ -1,32 +1,37 @@
-# JK BMS Studio — unified Windows application
+# JK BMS Studio — Windows C++ BLE + WebView2
 
-Native C++20 Bluetooth LE engine + embedded WebView2 HTML/CSS/JavaScript dashboard (no Python, no Win32 dashboard widgets).
+Ứng dụng giám sát JK BMS bằng Bluetooth LE của PC, giao diện web nhúng trong EXE, không cần Python.
 
-## Architecture
+## Kiến trúc
 
-- `src/main.cpp`: Win32 WebView2 host, BLE worker, GATT notifications, frame assembler and verified read-only telemetry.
-- `web/index.html`: complete responsive visual UI and message bridge to native backend.
-- `JK_BMS_PC.vcxproj`: VS2026 v145 / VS2022 v143; automatically copies `web/index.html` beside the EXE.
-- `.github/workflows/windows-build.yml`: Windows build CI.
+- `src/main.cpp`: Windows WebView2 host, BLE worker, GATT FFE0/FFE1, kết nối và gửi dữ liệu sang WebUI.
+- `src/jk_protocol.h`: bộ ghép khung JK, kiểm tra CRC, giải mã tự động JK02_24S / JK02_32S; JK04 chỉ giải mã điện áp cell.
+- `web/index.html`: Overview, Cell pin (thẻ cell + biểu đồ), Control trạng thái MOSFET, Protection đọc trạng thái khung Settings, BLE Diagnostics.
+- `tests/jk_protocol_tests.cpp`: test khung BLE/decoder.
+- `tests/webui_smoke.cjs`: test JavaScript và cập nhật DOM cell, Control/Protection, trạng thái kết nối.
+- `.github/workflows/windows-build.yml`: build và kiểm thử trên Windows; xuất EXE kèm WebUI.
 
-## Build / run
+## Build trên Visual Studio 2026
 
-1. `git pull origin main`.
-2. Open `JK_BMS_PC.sln` in Visual Studio 2026.
-3. Restore NuGet packages: `Microsoft.Windows.CppWinRT` and `Microsoft.Web.WebView2`.
-4. Select **Release | x64**, then **Rebuild Solution**.
-5. WebView2 Runtime must be installed (normally present with Microsoft Edge).
-6. Run EXE, scan for a BLE device, choose it, then Connect. Watch **BLE / Nhật ký**.
+1. Cập nhật mã nguồn từ `main`.
+2. Mở `JK_BMS_PC.sln`, chọn `Release | x64`.
+3. Restore NuGet Packages (WebView2), rồi Rebuild Solution.
+4. Mở EXE, **Quét BLE → chọn JK BMS → Kết nối**, để protocol **Tự nhận dạng (AUTO)**.
 
-## JK protocol
+## Trang giao diện
 
-JK BLE characteristic `FFE1` under service `FFE0`.
-After BLE notifications subscribe, `0x96` asks for Settings (response `0x01`), `0x97` asks for Device Info (response `0x03`); live measurements arrive as `0x02` streaming frames. No fake data, no repeated `0x96` workaround.
+- **Tổng quan:** điện áp/dòng/công suất/SOC, cell, MOSFET (dữ liệu BLE thực tế).
+- **Cell pin:** danh sách từng cell, min/max/avg, độ lệch mV so với trung bình, biểu đồ so sánh.
+- **Điều khiển:** hiển thị trạng thái Charge/Discharge/Balance. Các lệnh ghi/reboot vẫn khóa vì chưa kiểm tra an toàn theo model.
+- **Bảo vệ:** khung `0x01` khi được nhận được ghi nhận là *Settings RAW*. Những thông số chưa xác minh offset hiển thị `--`, không đoán giá trị.
+- **BLE / Nhật ký:** bộ đếm khung 0x01/0x02/0x03, thời điểm cuối, sao chép/xóa log, xuất dữ liệu RAW.
 
-Decoder for `JK02_32S` is experimental and MUST be verified against actual device logs. `JK02_24S` and `JK04` are displayed as protocol options but do **not** yet decode verified telemetry. Connection log, scan and raw capture are available.
+## Giao thức
 
-## Critical limitations
+Thiết bị sử dụng FFE0/FFE1. Sau khi bật notification, chương trình hỏi `0x97` (thông tin thiết bị); khung `0x03` nhận được kích hoạt yêu cầu trạng thái `0x96`. Nếu không có telemetry `0x02`, chương trình thử lại `0x96` với chu kỳ; khi đã có dữ liệu tự phát thì chỉ thử lại nếu stream gián đoạn.
 
-This is a **new architectural baseline, not a tested production build**. No Windows build verification or physical BMS validation is available here. Protection writes, MOSFET/balancing switches, configuration restore and reboot are intentionally disabled until exact model, firmware and write-acknowledgment semantics can be checked.
+Bộ giải mã JK02 được kiểm tra bằng mẫu tổng hợp và đã hiển thị số thực từ BMS trong quá trình thử nghiệm trên máy người dùng. **Chưa xác minh đầy đủ mọi dòng model/firmware JK**; JK04 chưa có dữ liệu pack đã xác nhận.
 
-To debug missing measurements: capture RAW BLE logs and inspect whether valid frame `0x02` arrives. `0x01` and `0x03` alone are insufficient for pack voltage, current and SOC.
+### Giới hạn an toàn
+
+Các lệnh thay đổi ngưỡng bảo vệ, charge/discharge MOSFET, cân bằng, khôi phục cấu hình và reboot BMS **chưa được thực hiện**. Cần xác định đúng model/firmware và khung lệnh ghi, ACK và đọc lại trước khi mở tính năng. EXE/CI build thành công không thay thế thử nghiệm với BMS thật.
